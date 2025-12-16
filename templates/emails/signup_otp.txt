@@ -1,0 +1,9 @@
+Signup OTP Verification – Trilex
+
+Welcome to Trilex! Please use the one-time verification code below to confirm your account:
+
+{{ otp }}
+
+This code will expire in 5 minutes.
+
+If you did not request this verification, you may safely ignore this email.

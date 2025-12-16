@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>{% block subject %}Trilex{% endblock %}</title>
+    <style>
+      body {
+        margin: 0;
+        padding: 0;
+        background-color: #eef2ff;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI",
+          Roboto, Helvetica, Arial, sans-serif;
+        font-size: 14px;
+        color: #1f2937;
+        line-height: 1.6;
+      }
+
+      .email-wrapper {
+        width: 100%;
+        padding: 40px 16px;
+      }
+
+      .email-card {
+        max-width: 640px;
+        margin: 0 auto;
+        background-color: #ffffff;
+        border-radius: 12px;
+        overflow: hidden;
+        box-shadow: 0 8px 20px rgba(0, 0, 0, 0.06);
+      }
+
+      .email-header {
+        background: linear-gradient(135deg, #091f5b, #0c2f8a);
+        padding: 20px 24px;
+        text-align: center;
+      }
+
+      .email-header h1 {
+        margin: 0;
+        font-size: 22px;
+        font-weight: 600;
+        color: #ffffff;
+        letter-spacing: 0.5px;
+      }
+
+      .email-body {
+        padding: 28px 24px 20px;
+      }
+
+      .greeting {
+        margin: 0 0 12px;
+        font-size: 15px;
+      }
+
+      .content {
+        font-size: 14px;
+      }
+
+      .content p {
+        margin: 0 0 12px;
+      }
+
+      .email-footer {
+        padding: 16px 24px 24px;
+        border-top: 1px solid #e5e7eb;
+        text-align: center;
+        font-size: 12px;
+        color: #6b7280;
+      }
+
+      .footer-location {
+        margin: 0;
+      }
+
+      .footer-copy {
+        margin: 6px 0 0;
+      }
+    </style>
+  </head>
+
+  <body>
+    <div class="email-wrapper">
+      <div class="email-card">
+        <div class="email-header">
+          <h1>Trilex</h1>
+        </div>
+
+        <div class="email-body">
+          <p class="greeting">Hello {{ email }},</p>
+
+          <div class="content">
+            {% block content %}
+            {% endblock %}
+          </div>
+        </div>
+
+        <div class="email-footer">
+          <p class="footer-location">Lalitpur, Nepal</p>
+          <p class="footer-copy">
+            © 2025 Trilex. All rights reserved.
+          </p>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>

@@ -1,0 +1,35 @@
+# Python bytecode
+__pycache__/
+*.py[cod]
+*.pyo
+
+# Virtual environment
+trilex/
+env/
+venv/
+
+# Django database (local only)
+db.sqlite3
+
+# Environment variables
+.env
+
+# VS Code settings
+.vscode/
+
+# Logs
+*.log
+
+# Static & media (optional for now)
+staticfiles/
+media/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Pytest cache
+.pytest_cache/
+
+# Migrations cache (don’t ignore migration files, only cache)
+*/migrations/__pycache__/

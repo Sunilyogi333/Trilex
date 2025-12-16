@@ -1,0 +1,11 @@
+Hello,
+
+Thank you for signing up with Trilex.
+
+Please verify your email address by visiting the link below:
+
+{{ verification_link }}
+
+If you did not create an account, you can safely ignore this email.
+
+— Trilex Team

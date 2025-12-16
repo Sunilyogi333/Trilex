@@ -1,0 +1,41 @@
+{% extends "emails/base_email.html" %}
+
+{% block subject %}
+Verify your email - Trilex
+{% endblock %}
+
+{% block content %}
+<p>
+  Thank you for signing up with <strong>Trilex</strong>.
+  Please verify your email address by clicking the button below:
+</p>
+
+<p style="margin: 20px 0; text-align: center;">
+  <a
+    href="{{ verification_link }}"
+    style="
+      display: inline-block;
+      padding: 12px 24px;
+      background-color: #091f5b;
+      color: #ffffff;
+      text-decoration: none;
+      border-radius: 6px;
+      font-weight: 500;
+    "
+  >
+    Verify Email
+  </a>
+</p>
+
+<p>
+  If the button doesn’t work, copy and paste this link into your browser:
+</p>
+
+<p style="word-break: break-all; font-size: 13px;">
+  {{ verification_link }}
+</p>
+
+<p>
+  This link may expire for security reasons.
+</p>
+{% endblock %}
