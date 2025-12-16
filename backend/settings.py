@@ -37,8 +37,7 @@ FRONTEND_URL = os.environ.get("FRONTEND_URL")
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
-
+ALLOWED_HOSTS = ["*"]
 
 # Application definition
 
