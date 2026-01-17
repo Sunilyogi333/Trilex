@@ -2,6 +2,7 @@ from django.urls import path
 from accounts.api.views import (
     SignupMobileView,
     SignupWebView,
+    SignupView,
     VerifyOTPView,
     VerifyLinkView,
     LoginView,
@@ -13,8 +14,9 @@ from accounts.api.views import (
 )
 
 urlpatterns = [
-    path("signup-mobile/", SignupMobileView.as_view()),
-    path("signup-web/", SignupWebView.as_view()),
+    path("signup/", SignupView.as_view()),
+    # path("signup-mobile/", SignupMobileView.as_view()),
+    # path("signup-web/", SignupWebView.as_view()),
     path("verify-otp/", VerifyOTPView.as_view()),
     path("verify-link/", VerifyLinkView.as_view()),
     path("resend-otp/", ResendOTPView.as_view()),

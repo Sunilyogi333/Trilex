@@ -15,6 +15,20 @@ from accounts.api.serializers import (
 )
 from accounts.services.auth_service import AuthService
 
+class SignupView(APIView):
+    permission_classes = [AllowAny]
+    @extend_schema(
+        request=SignupSerializer,
+        responses={200: dict},
+        tags=["auth"]
+    )
+
+    def post(self, request):
+        s = SignupSerializer(data=request.data)
+        s.is_valid(raise_exception=True)
+        data, status = AuthService.signup(**s.validated_data)
+        return Response(data, status=status)
+
 
 class SignupMobileView(APIView):
     permission_classes = [AllowAny]

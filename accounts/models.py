@@ -10,7 +10,7 @@ class User(AbstractUser, AbstractBaseModel):
     last_name = None
 
     email = models.EmailField(unique=True)
-    role = models.CharField(max_length=20, choices=UserRoles.choices, default=UserRoles.GUEST)
+    role = models.CharField(max_length=20, choices=UserRoles.choices, default=UserRoles.CLIENT)
     is_verified = models.BooleanField(default=False)
     otp_secret = models.CharField(
         max_length=32,

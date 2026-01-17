@@ -4,6 +4,7 @@ from django.contrib.auth.password_validation import validate_password
 class SignupSerializer(serializers.Serializer):
     email = serializers.EmailField()
     password = serializers.CharField(write_only=True)
+    client_type = serializers.ChoiceField(choices=['mobile', 'web'])
 
     def validate_password(self, value):
         validate_password(value)

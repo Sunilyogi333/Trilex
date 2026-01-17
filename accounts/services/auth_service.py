@@ -19,6 +19,24 @@ FRONTEND_URL = settings.FRONTEND_URL
 class AuthService:
 
     @staticmethod
+    def signup(email, password, client_type):
+        user = User.objects.create_user(
+            email=email,
+            password=password,
+            role=UserRoles.CLIENT,
+            is_verified=False,
+        )
+    
+        if client_type == "mobile":
+            otp = generate_otp_for_user(user)
+            send_signup_otp_email(user.email, otp)
+    
+        else:
+            token = create_secure_token({"email": user.email}, minutes=30)
+            link = f"{FRONTEND_URL}/verify-email?token={token}"
+            send_verification_link_email(user.email, link)
+    
+    @staticmethod
     def signup_mobile(email, password):
         if User.objects.filter(email=email).exists():
             return {"message": "User already exists"}, 400

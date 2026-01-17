@@ -52,7 +52,8 @@ INSTALLED_APPS = [
     "rest_framework",
     "drf_spectacular",
     "accounts",
-    "base"
+    "base",
+    "clients"
 ]
 
 AUTH_USER_MODEL = "accounts.User"
