@@ -6,7 +6,7 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import AllowAny, IsAuthenticated
 
-from drf_spectacular.utils import extend_schema
+from drf_spectacular.utils import extend_schema, OpenApiResponse, OpenApiParameter
 
 from base.constants.user_roles import UserRoles
 from base.constants.verification import VerificationStatus
@@ -40,7 +40,18 @@ def is_admin_user(user):
 class FirmSignupView(APIView):
     permission_classes = [AllowAny]
 
-    @extend_schema(request=FirmSignupSerializer, responses={201: dict}, tags=["firms"])
+    @extend_schema(
+        summary="Firm signup",
+        description="Create a firm account and submit initial verification details.",
+        request=FirmSignupSerializer,
+        responses={
+            201: OpenApiResponse(
+                description="Firm created and verification submitted"
+            ),
+            400: OpenApiResponse(description="Email already registered"),
+        },
+        tags=["firms"],
+    )
     @transaction.atomic
     def post(self, request):
         serializer = FirmSignupSerializer(data=request.data)
@@ -65,7 +76,7 @@ class FirmSignupView(APIView):
 
         FirmVerification.objects.create(
             user=user,
-            status=FirmVerification.Status.PENDING,
+            status=VerificationStatus.PENDING,
             **verification_data
         )
 
@@ -86,7 +97,12 @@ class FirmSignupView(APIView):
 class FirmMeView(APIView):
     permission_classes = [IsAuthenticated, IsFirmUser]
 
-    @extend_schema(responses={200: FirmMeSerializer}, tags=["firms"])
+    @extend_schema(
+        summary="Get my firm profile",
+        description="Returns authenticated firm's user info, profile and verification status.",
+        responses={200: FirmMeSerializer},
+        tags=["firms"],
+    )
     def get(self, request):
         firm = request.user.firm_profile
         verification = FirmVerification.objects.filter(user=request.user).first()
@@ -102,7 +118,15 @@ class FirmMeView(APIView):
 class FirmProfileUpdateView(APIView):
     permission_classes = [IsAuthenticated, IsFirmUser]
 
-    @extend_schema(request=FirmProfileUpdateSerializer, responses={200: dict}, tags=["firms"])
+    @extend_schema(
+        summary="Update firm profile",
+        description="Update firm profile fields like phone number, address, or services.",
+        request=FirmProfileUpdateSerializer,
+        responses={
+            200: OpenApiResponse(description="Profile updated successfully")
+        },
+        tags=["firms"],
+    )
     def patch(self, request):
         firm = request.user.firm_profile
 
@@ -122,7 +146,17 @@ class FirmProfileUpdateView(APIView):
 class FirmVerificationView(APIView):
     permission_classes = [IsAuthenticated, IsFirmUser]
 
-    @extend_schema(request=FirmVerificationSerializer, responses={201: dict}, tags=["firms"])
+    @extend_schema(
+        summary="Submit firm verification",
+        description="Submit or resubmit firm verification details.",
+        request=FirmVerificationSerializer,
+        responses={
+            201: OpenApiResponse(
+                description="Verification submitted"
+            )
+        },
+        tags=["firm-verifications"],
+    )
     def post(self, request):
         serializer = FirmVerificationSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -141,11 +175,16 @@ class FirmVerificationView(APIView):
 class FirmVerificationMeView(APIView):
     permission_classes = [IsAuthenticated, IsFirmUser]
 
-    @extend_schema(responses=FirmVerificationMeSerializer, tags=["firms"])
+    @extend_schema(
+        summary="Get my verification status",
+        description="Returns the firm's verification details and current status.",
+        responses={200: FirmVerificationMeSerializer},
+        tags=["firm-verifications"],
+    )
     def get(self, request):
         verification = FirmVerification.objects.filter(user=request.user).first()
         if not verification:
-            return Response({"status": FirmVerification.Status.NOT_SUBMITTED})
+            return Response({"status": VerificationStatus.NOT_SUBMITTED})
 
         serializer = FirmVerificationMeSerializer(verification)
         return Response(serializer.data)
@@ -156,7 +195,27 @@ class FirmVerificationMeView(APIView):
 class FirmVerificationActionView(APIView):
     permission_classes = [IsAuthenticated, IsAdminUser]
 
-    @extend_schema(tags=["firms"])
+    @extend_schema(
+        summary="Approve or reject firm verification",
+        description=(
+            "Admin-only endpoint to approve or reject a firm verification. "
+            "If rejecting, a reason must be provided in the request body."
+        ),
+        parameters=[
+            OpenApiParameter(
+                name="action",
+                type=str,
+                location=OpenApiParameter.PATH,
+                enum=["approve", "reject"],
+                description="Verification action",
+            )
+        ],
+        responses={
+            200: OpenApiResponse(description="Action completed"),
+            400: OpenApiResponse(description="Invalid action"),
+        },
+        tags=["firm-verifications"],
+    )
     def post(self, request, verification_id, action):
         verification = get_object_or_404(
             FirmVerification,
@@ -189,7 +248,17 @@ class FirmVerificationActionView(APIView):
 class FirmListView(APIView):
     permission_classes = [AllowAny]
 
-    @extend_schema(tags=["firms"])
+    @extend_schema(
+        summary="List firms",
+        description=(
+            "Public users see only verified firms. "
+            "Admins see all firms with full verification details."
+        ),
+        responses={
+            200: FirmPublicSerializer(many=True)
+        },
+        tags=["firms"],
+    )
     def get(self, request):
         admin = is_admin_user(request.user)
         qs = Firm.objects.select_related("user").prefetch_related("services")
@@ -221,8 +290,21 @@ class FirmVerificationListView(APIView):
     permission_classes = [IsAuthenticated, IsAdminUser]
 
     @extend_schema(
-        responses={200: FirmAdminVerificationSerializer(many=True)},
-        tags=["firms"]
+        summary="List firm verifications (admin)",
+        description="Admin-only endpoint to list firm verifications with optional status filter.",
+        parameters=[
+            OpenApiParameter(
+                name="status",
+                type=str,
+                location=OpenApiParameter.QUERY,
+                enum=[v for v, _ in VerificationStatus.choices],
+                description="Filter by verification status",
+            )
+        ],
+        responses={
+            200: FirmAdminVerificationSerializer(many=True)
+        },
+        tags=["firm-verifications"],
     )
     def get(self, request):
         qs = FirmVerification.objects.select_related("user")
@@ -238,7 +320,17 @@ class FirmVerificationListView(APIView):
 class FirmDetailView(APIView):
     permission_classes = [AllowAny]
 
-    @extend_schema(tags=["firms"])
+    @extend_schema(
+        summary="Get firm details",
+        description=(
+            "Public users can view only verified firms. "
+            "Admins can view all firms with full verification data."
+        ),
+        responses={
+            200: FirmPublicSerializer
+        },
+        tags=["firms"],
+    )
     def get(self, request, firm_id):
         admin = is_admin_user(request.user)
         qs = Firm.objects.select_related("user").prefetch_related("services")

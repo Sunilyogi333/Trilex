@@ -6,7 +6,11 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import AllowAny, IsAuthenticated
 
-from drf_spectacular.utils import extend_schema
+from drf_spectacular.utils import (
+    extend_schema,
+    OpenApiResponse,
+    OpenApiParameter,
+)
 
 from base.constants.user_roles import UserRoles
 from base.constants.verification import VerificationStatus
@@ -35,13 +39,22 @@ def is_admin_user(user):
     return user.is_authenticated and user.role == UserRoles.ADMIN
 
 
-# -------------------------
+# =========================
 # SIGNUP
-# -------------------------
+# =========================
 class LawyerSignupView(APIView):
     permission_classes = [AllowAny]
 
-    @extend_schema(request=LawyerSignupSerializer, responses={201: dict}, tags=["lawyers"])
+    @extend_schema(
+        summary="Lawyer signup",
+        description="Create a lawyer account and submit initial bar verification details.",
+        request=LawyerSignupSerializer,
+        responses={
+            201: OpenApiResponse(description="Lawyer created and verification submitted"),
+            400: OpenApiResponse(description="Email already registered"),
+        },
+        tags=["lawyers"],
+    )
     @transaction.atomic
     def post(self, request):
         serializer = LawyerSignupSerializer(data=request.data)
@@ -81,13 +94,18 @@ class LawyerSignupView(APIView):
         )
 
 
-# -------------------------
+# =========================
 # ME
-# -------------------------
+# =========================
 class LawyerMeView(APIView):
     permission_classes = [IsAuthenticated, IsLawyerUser]
 
-    @extend_schema(responses={200: LawyerMeSerializer}, tags=["lawyers"])
+    @extend_schema(
+        summary="Get my lawyer profile",
+        description="Returns authenticated lawyer's user info, profile and verification status.",
+        responses={200: LawyerMeSerializer},
+        tags=["lawyers"],
+    )
     def get(self, request):
         lawyer = request.user.lawyer_profile
         verification = getattr(request.user, "bar_verification", None)
@@ -103,7 +121,15 @@ class LawyerMeView(APIView):
 class LawyerProfileUpdateView(APIView):
     permission_classes = [IsAuthenticated, IsLawyerUser]
 
-    @extend_schema(request=LawyerProfileUpdateSerializer, responses={200: dict}, tags=["lawyers"])
+    @extend_schema(
+        summary="Update lawyer profile",
+        description="Update lawyer profile fields like phone number, address, or services.",
+        request=LawyerProfileUpdateSerializer,
+        responses={
+            200: OpenApiResponse(description="Profile updated successfully")
+        },
+        tags=["lawyers"],
+    )
     def patch(self, request):
         lawyer = request.user.lawyer_profile
 
@@ -117,13 +143,21 @@ class LawyerProfileUpdateView(APIView):
         return Response({"message": "Profile updated successfully"})
 
 
-# -------------------------
+# =========================
 # VERIFICATION
-# -------------------------
+# =========================
 class BarVerificationView(APIView):
     permission_classes = [IsAuthenticated, IsLawyerUser]
 
-    @extend_schema(request=BarVerificationSerializer, responses={201: dict}, tags=["lawyers"])
+    @extend_schema(
+        summary="Submit bar verification",
+        description="Submit or resubmit lawyer bar verification details.",
+        request=BarVerificationSerializer,
+        responses={
+            201: OpenApiResponse(description="Verification submitted")
+        },
+        tags=["lawyer-verifications"],
+    )
     def post(self, request):
         serializer = BarVerificationSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -142,7 +176,12 @@ class BarVerificationView(APIView):
 class BarVerificationMeView(APIView):
     permission_classes = [IsAuthenticated, IsLawyerUser]
 
-    @extend_schema(responses=BarVerificationMeSerializer, tags=["lawyers"])
+    @extend_schema(
+        summary="Get my verification status",
+        description="Returns the lawyer's bar verification details and current status.",
+        responses={200: BarVerificationMeSerializer},
+        tags=["lawyer-verifications"],
+    )
     def get(self, request):
         verification = getattr(request.user, "bar_verification", None)
         if not verification:
@@ -155,15 +194,26 @@ class BarVerificationMeView(APIView):
         return Response(serializer.data)
 
 
-# -------------------------
+# =========================
 # ADMIN: VERIFICATION LIST & ACTIONS
-# -------------------------
+# =========================
 class BarVerificationListView(APIView):
     permission_classes = [IsAuthenticated, IsAdminUser]
 
     @extend_schema(
+        summary="List lawyer verifications (admin)",
+        description="Admin-only endpoint to list lawyer verifications with optional status filter.",
+        parameters=[
+            OpenApiParameter(
+                name="status",
+                type=str,
+                location=OpenApiParameter.QUERY,
+                enum=[v for v, _ in VerificationStatus.choices],
+                description="Filter by verification status",
+            )
+        ],
         responses={200: LawyerAdminVerificationSerializer(many=True)},
-        tags=["lawyers"]
+        tags=["lawyer-verifications"],
     )
     def get(self, request):
         qs = BarVerification.objects.select_related("user")
@@ -179,29 +229,62 @@ class BarVerificationListView(APIView):
 class BarVerificationActionView(APIView):
     permission_classes = [IsAuthenticated, IsAdminUser]
 
-    @extend_schema(tags=["lawyers"])
+    @extend_schema(
+        summary="Approve or reject lawyer verification",
+        description=(
+            "Admin-only endpoint to approve or reject a lawyer bar verification. "
+            "If rejecting, a reason must be provided in the request body."
+        ),
+        parameters=[
+            OpenApiParameter(
+                name="action",
+                type=str,
+                location=OpenApiParameter.PATH,
+                enum=["approve", "reject"],
+                description="Verification action",
+            )
+        ],
+        responses={
+            200: OpenApiResponse(description="Action completed"),
+            400: OpenApiResponse(description="Invalid action"),
+        },
+        tags=["lawyer-verifications"],
+    )
     def post(self, request, verification_id, action):
         verification = get_object_or_404(BarVerification, id=verification_id)
 
         if action == "approve":
             LawyerVerificationService.approve(verification)
-            return Response({"message": "Lawyer verified successfully"}, status=200)
+            return Response(
+                {"message": "Lawyer verified successfully"},
+                status=200
+            )
 
         if action == "reject":
             reason = request.data.get("reason")
             LawyerVerificationService.reject(verification, reason)
-            return Response({"message": "Lawyer verification rejected"}, status=200)
+            return Response(
+                {"message": "Lawyer verification rejected"},
+                status=200
+            )
 
         return Response({"error": "Invalid action"}, status=400)
 
 
-# -------------------------
+# =========================
 # LIST & DETAIL
-# -------------------------
+# =========================
 class LawyerListView(APIView):
     permission_classes = [AllowAny]
 
-    @extend_schema(tags=["lawyers"])
+    @extend_schema(
+        summary="List lawyers",
+        description=(
+            "Public users see only verified lawyers with limited verification data. "
+            "Admins see all lawyers with full verification details."
+        ),
+        tags=["lawyers"],
+    )
     def get(self, request):
         admin = is_admin_user(request.user)
 
@@ -234,7 +317,14 @@ class LawyerListView(APIView):
 class LawyerDetailView(APIView):
     permission_classes = [AllowAny]
 
-    @extend_schema(tags=["lawyers"])
+    @extend_schema(
+        summary="Get lawyer details",
+        description=(
+            "Public users can view only verified lawyers. "
+            "Admins can view all lawyers with full verification data."
+        ),
+        tags=["lawyers"],
+    )
     def get(self, request, lawyer_id):
         admin = is_admin_user(request.user)
 

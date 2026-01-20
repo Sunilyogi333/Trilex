@@ -6,7 +6,11 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import AllowAny, IsAuthenticated
 
-from drf_spectacular.utils import extend_schema
+from drf_spectacular.utils import (
+    extend_schema,
+    OpenApiResponse,
+    OpenApiParameter,
+)
 
 from base.constants.user_roles import UserRoles
 from base.constants.verification import VerificationStatus
@@ -24,7 +28,7 @@ from clients.api.serializers import (
     IDVerificationMeSerializer,
     ClientPublicSerializer,
     ClientAdminSerializer,
-    ClientAdminVerificationSerializer
+    ClientAdminVerificationSerializer,
 )
 
 User = get_user_model()
@@ -34,13 +38,22 @@ def is_admin_user(user):
     return user.is_authenticated and user.role == UserRoles.ADMIN
 
 
-# -------------------------
+# =========================
 # SIGNUP
-# -------------------------
+# =========================
 class ClientSignupView(APIView):
     permission_classes = [AllowAny]
 
-    @extend_schema(request=ClientSignupSerializer, responses={201: dict}, tags=["clients"])
+    @extend_schema(
+        summary="Client signup",
+        description="Create a client account and start the email verification process.",
+        request=ClientSignupSerializer,
+        responses={
+            201: OpenApiResponse(description="Client created successfully"),
+            400: OpenApiResponse(description="Email already registered"),
+        },
+        tags=["clients"],
+    )
     @transaction.atomic
     def post(self, request):
         serializer = ClientSignupSerializer(data=request.data)
@@ -69,13 +82,18 @@ class ClientSignupView(APIView):
         )
 
 
-# -------------------------
+# =========================
 # ME
-# -------------------------
+# =========================
 class ClientMeView(APIView):
     permission_classes = [IsAuthenticated, IsClientUser]
 
-    @extend_schema(responses={200: ClientMeSerializer}, tags=["clients"])
+    @extend_schema(
+        summary="Get my client profile",
+        description="Returns authenticated client's user info, profile and verification status.",
+        responses={200: ClientMeSerializer},
+        tags=["clients"],
+    )
     def get(self, request):
         client = request.user.client_profile
         verification = IDVerification.objects.filter(user=request.user).first()
@@ -91,7 +109,15 @@ class ClientMeView(APIView):
 class ClientProfileUpdateView(APIView):
     permission_classes = [IsAuthenticated, IsClientUser]
 
-    @extend_schema(request=ClientProfileUpdateSerializer, responses={200: dict}, tags=["clients"])
+    @extend_schema(
+        summary="Update client profile",
+        description="Update client profile fields like phone number or address.",
+        request=ClientProfileUpdateSerializer,
+        responses={
+            200: OpenApiResponse(description="Profile updated successfully")
+        },
+        tags=["clients"],
+    )
     def patch(self, request):
         client = request.user.client_profile
 
@@ -105,13 +131,21 @@ class ClientProfileUpdateView(APIView):
         return Response({"message": "Profile updated successfully"})
 
 
-# -------------------------
+# =========================
 # VERIFICATION
-# -------------------------
+# =========================
 class IDVerificationView(APIView):
     permission_classes = [IsAuthenticated, IsClientUser]
 
-    @extend_schema(request=IDVerificationSerializer, responses={201: dict}, tags=["clients"])
+    @extend_schema(
+        summary="Submit ID verification",
+        description="Submit or resubmit client identity verification documents.",
+        request=IDVerificationSerializer,
+        responses={
+            201: OpenApiResponse(description="Verification submitted")
+        },
+        tags=["client-verifications"],
+    )
     def post(self, request):
         serializer = IDVerificationSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -130,24 +164,44 @@ class IDVerificationView(APIView):
 class IDVerificationMeView(APIView):
     permission_classes = [IsAuthenticated, IsClientUser]
 
-    @extend_schema(responses=IDVerificationMeSerializer, tags=["clients"])
+    @extend_schema(
+        summary="Get my verification status",
+        description="Returns the client's ID verification details and current status.",
+        responses={200: IDVerificationMeSerializer},
+        tags=["client-verifications"],
+    )
     def get(self, request):
         verification = IDVerification.objects.filter(user=request.user).first()
         if not verification:
-            return Response({"status": IDVerification.Status.NOT_SUBMITTED})
+            return Response(
+                {"status": IDVerification.Status.NOT_SUBMITTED},
+                status=200,
+            )
 
         serializer = IDVerificationMeSerializer(verification)
         return Response(serializer.data)
 
-# -------------------------
+
+# =========================
 # ADMIN: LIST VERIFICATIONS
-# -------------------------
+# =========================
 class IDVerificationListView(APIView):
     permission_classes = [IsAuthenticated, IsAdminUser]
 
     @extend_schema(
+        summary="List client verifications (admin)",
+        description="Admin-only endpoint to list client ID verifications with optional status filter.",
+        parameters=[
+            OpenApiParameter(
+                name="status",
+                type=str,
+                location=OpenApiParameter.QUERY,
+                enum=[v for v, _ in VerificationStatus.choices],
+                description="Filter by verification status",
+            )
+        ],
         responses={200: ClientAdminVerificationSerializer(many=True)},
-        tags=["clients"]
+        tags=["client-verifications"],
     )
     def get(self, request):
         qs = IDVerification.objects.select_related("user")
@@ -160,36 +214,70 @@ class IDVerificationListView(APIView):
         return Response(serializer.data, status=200)
 
 
-# -------------------------
+# =========================
 # ADMIN: APPROVE / REJECT
-# -------------------------
+# =========================
 class IDVerificationActionView(APIView):
     permission_classes = [IsAuthenticated, IsAdminUser]
 
-    @extend_schema(tags=["clients"])
+    @extend_schema(
+        summary="Approve or reject client verification",
+        description=(
+            "Admin-only endpoint to approve or reject a client ID verification. "
+            "If rejecting, a reason must be provided in the request body."
+        ),
+        parameters=[
+            OpenApiParameter(
+                name="action",
+                type=str,
+                location=OpenApiParameter.PATH,
+                enum=["approve", "reject"],
+                description="Verification action",
+            )
+        ],
+        responses={
+            200: OpenApiResponse(description="Action completed"),
+            400: OpenApiResponse(description="Invalid action"),
+        },
+        tags=["client-verifications"],
+    )
     def post(self, request, verification_id, action):
         verification = get_object_or_404(IDVerification, id=verification_id)
 
         if action == "approve":
             ClientVerificationService.approve(verification)
-            return Response({"message": "Client verified successfully"})
+            return Response(
+                {"message": "Client verified successfully"},
+                status=200,
+            )
 
         if action == "reject":
             ClientVerificationService.reject(
-                verification, request.data.get("reason")
+                verification,
+                request.data.get("reason"),
             )
-            return Response({"message": "Client verification rejected"})
+            return Response(
+                {"message": "Client verification rejected"},
+                status=200,
+            )
 
         return Response({"error": "Invalid action"}, status=400)
 
 
-# -------------------------
+# =========================
 # LIST & DETAIL
-# -------------------------
+# =========================
 class ClientListView(APIView):
     permission_classes = [AllowAny]
 
-    @extend_schema(tags=["clients"])
+    @extend_schema(
+        summary="List clients",
+        description=(
+            "Public users see only verified clients with limited verification data. "
+            "Admins see all clients with full verification details."
+        ),
+        tags=["clients"],
+    )
     def get(self, request):
         admin = is_admin_user(request.user)
 
@@ -221,7 +309,14 @@ class ClientListView(APIView):
 class ClientDetailView(APIView):
     permission_classes = [AllowAny]
 
-    @extend_schema(tags=["clients"])
+    @extend_schema(
+        summary="Get client details",
+        description=(
+            "Public users can view only verified clients. "
+            "Admins can view all clients with full verification data."
+        ),
+        tags=["clients"],
+    )
     def get(self, request, client_id):
         admin = is_admin_user(request.user)
 
