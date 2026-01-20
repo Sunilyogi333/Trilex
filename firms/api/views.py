@@ -1,8 +1,8 @@
-# clients/api/views.py
+# firms/api/views.py
 
 from django.db import transaction
-from django.shortcuts import get_object_or_404
 from django.contrib.auth import get_user_model
+from django.shortcuts import get_object_or_404
 
 from rest_framework.views import APIView
 from rest_framework.response import Response
@@ -11,85 +11,96 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from drf_spectacular.utils import extend_schema
 
 from accounts.constants import UserRoles
-from accounts.permissions import IsClientUser, IsAdminUser
+from accounts.permissions import IsFirmUser, IsAdminUser
 from accounts.services.auth_service import AuthService
 
-from clients.models import Client, IDVerification
-from clients.services.verification_service import ClientVerificationService
-from clients.api.serializers import (
-    ClientSignupSerializer,
-    IDVerificationSerializer,
-    IDVerificationMeSerializer,
+from firms.models import Firm, FirmVerification
+from firms.api.serializers import (
+    FirmSignupSerializer,
+    FirmVerificationSerializer,
+    FirmVerificationMeSerializer
 )
+from firms.services.verification_service import FirmVerificationService
 
 User = get_user_model()
 
 
 # -------------------------
-# CLIENT SIGNUP
+# SIGNUP
 # -------------------------
-class ClientSignupView(APIView):
+class FirmSignupView(APIView):
     permission_classes = [AllowAny]
 
     @extend_schema(
-        request=ClientSignupSerializer,
+        request=FirmSignupSerializer,
         responses={201: dict},
-        tags=["clients"]
+        tags=["firms"]
     )
     @transaction.atomic
     def post(self, request):
-        serializer = ClientSignupSerializer(data=request.data)
+        serializer = FirmSignupSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
-        if User.objects.filter(email=serializer.validated_data["email"]).exists():
+        data = serializer.validated_data
+        verification_data = data.pop("verification")
+
+        if User.objects.filter(email=data["email"]).exists():
             return Response(
                 {"error": "Email already registered"},
                 status=400
             )
 
         user = User.objects.create_user(
-            email=serializer.validated_data["email"],
-            password=serializer.validated_data["password"],
-            role=UserRoles.CLIENT,
-            is_email_verified=False
+            email=data["email"],
+            password=data["password"],
+            role=UserRoles.FIRM,
+            is_email_verified=False,
         )
 
-        Client.objects.create(user=user)
+        Firm.objects.create(user=user)
+
+        FirmVerification.objects.create(
+            user=user,
+            status=FirmVerification.Status.PENDING,
+            **verification_data
+        )
 
         AuthService.send_signup_verification(
             user=user,
-            client_type=serializer.validated_data["client_type"]
+            client_type=data["client_type"]
         )
 
         return Response(
-            {"message": "Client signup successful. Please verify your email."},
+            {
+                "message": "Firm signup successful. Verification submitted.",
+                "verification_status": FirmVerification.Status.PENDING,
+            },
             status=201
         )
 
-
 # -------------------------
-# CLIENT: SUBMIT / RESUBMIT
+# FIRM: SUBMIT / RESUBMIT VERIFICATION
 # -------------------------
-class IDVerificationView(APIView):
-    permission_classes = [IsAuthenticated, IsClientUser]
+class FirmVerificationView(APIView):
+    permission_classes = [IsAuthenticated, IsFirmUser]
 
     @extend_schema(
-        request=IDVerificationSerializer,
+        request=FirmVerificationSerializer,
         responses={201: dict},
-        tags=["clients"]
+        tags=["firms"]
     )
     def post(self, request):
-        serializer = IDVerificationSerializer(data=request.data)
+        serializer = FirmVerificationSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
-        verification = ClientVerificationService.submit(
+        verification = FirmVerificationService.submit(
             user=request.user,
             **serializer.validated_data
         )
 
         return Response(
             {
-                "message": "ID verification submitted successfully",
+                "message": "Firm verification submitted",
                 "status": verification.status,
             },
             status=201
@@ -97,43 +108,43 @@ class IDVerificationView(APIView):
 
 
 # -------------------------
-# CLIENT: VIEW STATUS
+# FIRM: VIEW OWN STATUS
 # -------------------------
-class IDVerificationMeView(APIView):
-    permission_classes = [IsAuthenticated, IsClientUser]
+class FirmVerificationMeView(APIView):
+    permission_classes = [IsAuthenticated, IsFirmUser]
 
     @extend_schema(
-        tags=["clients"]
+        tags=["firms"]
     )
 
     def get(self, request):
-        verification = IDVerification.objects.filter(
+        verification = FirmVerification.objects.filter(
             user=request.user
         ).first()
 
         if not verification:
             return Response(
-                {"status": IDVerification.Status.NOT_SUBMITTED},
+                {"status": FirmVerification.Status.NOT_SUBMITTED},
                 status=200
             )
 
-        serializer = IDVerificationMeSerializer(verification)
+        serializer = FirmVerificationMeSerializer(verification)
         return Response(serializer.data, status=200)
 
 
 # -------------------------
-# ADMIN: LIST
+# ADMIN: LIST / ACTIONS
 # -------------------------
-class IDVerificationListView(APIView):
+class FirmVerificationListView(APIView):
     permission_classes = [IsAuthenticated, IsAdminUser]
 
     @extend_schema(
-        tags=["clients"]
+        tags=["firms"]
     )
 
     def get(self, request):
+        qs = FirmVerification.objects.all()
         status = request.query_params.get("status")
-        qs = IDVerification.objects.all()
 
         if status:
             qs = qs.filter(status=status)
@@ -143,7 +154,7 @@ class IDVerificationListView(APIView):
                 {
                     "id": v.id,
                     "email": v.user.email,
-                    "full_name": v.full_name,
+                    "firm_name": v.firm_name,
                     "status": v.status,
                 }
                 for v in qs
@@ -152,31 +163,28 @@ class IDVerificationListView(APIView):
         )
 
 
-# -------------------------
-# ADMIN: APPROVE / REJECT
-# -------------------------
-class IDVerificationActionView(APIView):
+class FirmVerificationActionView(APIView):
     permission_classes = [IsAuthenticated, IsAdminUser]
 
     @extend_schema(
-        tags=["clients"]
+        tags=["firms"]
     )
 
     def post(self, request, verification_id, action):
         verification = get_object_or_404(
-            IDVerification,
+            FirmVerification,
             id=verification_id
         )
 
         if action == "approve":
-            ClientVerificationService.approve(verification)
-            return Response({"message": "Client verified successfully"}, status=200)
+            FirmVerificationService.approve(verification)
+            return Response({"message": "Firm verified"}, status=200)
 
         if action == "reject":
-            ClientVerificationService.reject(
+            FirmVerificationService.reject(
                 verification,
                 request.data.get("reason")
             )
-            return Response({"message": "Client verification rejected"}, status=200)
+            return Response({"message": "Firm rejected"}, status=200)
 
         return Response({"error": "Invalid action"}, status=400)

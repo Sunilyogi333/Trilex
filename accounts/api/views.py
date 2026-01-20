@@ -1,65 +1,33 @@
 from rest_framework.views import APIView
 from rest_framework.response import Response
-from rest_framework.permissions import AllowAny
+from rest_framework.permissions import AllowAny, IsAuthenticated
 
 from drf_spectacular.utils import extend_schema
 
 from accounts.api.serializers import (
-    SignupSerializer,
+    LoginSerializer,
     VerifyOTPSerializer,
     TokenSerializer,
-    LoginSerializer,
     EmailSerializer,
     ForgotPasswordVerifyOTPSerializer,
     ResetPasswordSerializer
 )
 from accounts.services.auth_service import AuthService
+from accounts.api.serializers import MeSerializer
 
-class SignupView(APIView):
+class LoginView(APIView):
     permission_classes = [AllowAny]
     @extend_schema(
-        request=SignupSerializer,
+        request=LoginSerializer,
         responses={200: dict},
         tags=["auth"]
     )
 
     def post(self, request):
-        s = SignupSerializer(data=request.data)
+        s = LoginSerializer(data=request.data)
         s.is_valid(raise_exception=True)
-        data, status = AuthService.signup(**s.validated_data)
+        data, status = AuthService.login(**s.validated_data)
         return Response(data, status=status)
-
-
-class SignupMobileView(APIView):
-    permission_classes = [AllowAny]
-    @extend_schema(
-        request=SignupSerializer,
-        responses={201: dict},
-        tags=["auth"]
-    )
-
-    def post(self, request):
-        s = SignupSerializer(data=request.data)
-        print(request.data)
-        s.is_valid(raise_exception=True)
-        data, status = AuthService.signup_mobile(**s.validated_data)
-        return Response(data, status=status)
-
-
-class SignupWebView(APIView):
-    permission_classes = [AllowAny]
-    @extend_schema(
-        request=SignupSerializer,
-        responses={200: dict},
-        tags=["auth"]
-    )
-    
-    def post(self, request):
-        s = SignupSerializer(data=request.data)
-        s.is_valid(raise_exception=True)
-        data, status = AuthService.signup_web(**s.validated_data)
-        return Response(data, status=status)
-
 
 class VerifyOTPView(APIView):
     permission_classes = [AllowAny]
@@ -90,21 +58,6 @@ class VerifyLinkView(APIView):
         s.is_valid(raise_exception=True)
         success, msg = AuthService.verify_link(s.validated_data["token"])
         return Response({"message": msg})
-
-
-class LoginView(APIView):
-    permission_classes = [AllowAny]
-    @extend_schema(
-        request=LoginSerializer,
-        responses={200: dict},
-        tags=["auth"]
-    )
-
-    def post(self, request):
-        s = LoginSerializer(data=request.data)
-        s.is_valid(raise_exception=True)
-        data, status = AuthService.login(**s.validated_data)
-        return Response(data, status=status)
 
 class ResendOTPView(APIView):
     permission_classes = [AllowAny]
@@ -179,3 +132,13 @@ class ResetPasswordView(APIView):
         s.is_valid(raise_exception=True)
         data, status = AuthService.reset_password(**s.validated_data)
         return Response(data, status=status)
+
+class MeView(APIView):
+    permission_classes = [IsAuthenticated]
+    @extend_schema(
+        tags=["auth"]
+    )
+
+    def get(self, request):
+        serializer = MeSerializer(request.user)
+        return Response(serializer.data, status=200)

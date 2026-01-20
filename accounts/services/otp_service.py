@@ -21,11 +21,11 @@ def verify_user_otp(user, otp):
     if not totp.verify(otp, valid_window=1):
         return False, "Invalid or expired OTP"
 
-    user.is_verified = True
+    user.is_email_verified = True
 
     user.otp_secret = pyotp.random_base32()
 
-    user.save(update_fields=["is_verified", "otp_secret"])
+    user.save(update_fields=["is_email_verified", "otp_secret"])
 
     return True, "Email verified successfully"
 

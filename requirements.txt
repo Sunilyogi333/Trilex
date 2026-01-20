@@ -1,14 +1,16 @@
 asgiref==3.11.0
 attrs==25.4.0
+certifi==2026.1.4
+cloudinary==1.44.1
 dj-database-url==3.0.1
 Django==5.2.9
 djangorestframework==3.16.1
 djangorestframework_simplejwt==5.5.1
-gunicorn==22.0.0
 drf-spectacular==0.29.0
 inflection==0.5.1
 jsonschema==4.25.1
 jsonschema-specifications==2025.9.1
+pillow==12.1.0
 psycopg==3.3.2
 psycopg-binary==3.3.2
 PyJWT==2.10.1
@@ -17,6 +19,8 @@ python-dotenv==1.2.1
 PyYAML==6.0.3
 referencing==0.37.0
 rpds-py==0.30.0
+six==1.17.0
 sqlparse==0.5.4
 typing_extensions==4.15.0
 uritemplate==4.2.0
+urllib3==2.6.3

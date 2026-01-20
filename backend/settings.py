@@ -18,6 +18,9 @@ import dj_database_url
 
 load_dotenv()
 
+import cloudinary
+import cloudinary.uploader
+import cloudinary.api
 
 from datetime import timedelta
 
@@ -49,11 +52,16 @@ INSTALLED_APPS = [
     "django.contrib.messages",
     "django.contrib.staticfiles",
 
+    "corsheaders",
+
     "rest_framework",
     "drf_spectacular",
     "accounts",
     "base",
-    "clients"
+    "clients",
+    "lawyers",
+    "firms",
+    "media"
 ]
 
 AUTH_USER_MODEL = "accounts.User"
@@ -96,7 +104,12 @@ MIDDLEWARE = [
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
+    "corsheaders.middleware.CorsMiddleware",
+    "django.middleware.common.CommonMiddleware",
 ]
+
+CORS_ALLOW_ALL_ORIGINS = True
+CORS_ALLOW_CREDENTIALS = True
 
 ROOT_URLCONF = "backend.urls"
 

@@ -1,8 +1,8 @@
-# clients/api/views.py
+# lawyers/api/views.py
 
 from django.db import transaction
-from django.shortcuts import get_object_or_404
 from django.contrib.auth import get_user_model
+from django.shortcuts import get_object_or_404
 
 from rest_framework.views import APIView
 from rest_framework.response import Response
@@ -11,85 +11,102 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from drf_spectacular.utils import extend_schema
 
 from accounts.constants import UserRoles
-from accounts.permissions import IsClientUser, IsAdminUser
+from accounts.permissions import IsLawyerUser, IsAdminUser
 from accounts.services.auth_service import AuthService
 
-from clients.models import Client, IDVerification
-from clients.services.verification_service import ClientVerificationService
-from clients.api.serializers import (
-    ClientSignupSerializer,
-    IDVerificationSerializer,
-    IDVerificationMeSerializer,
+from lawyers.models import Lawyer, BarVerification
+from lawyers.api.serializers import (
+    LawyerSignupSerializer,
+    BarVerificationSerializer,
+    BarVerificationMeSerializer
 )
+from lawyers.services.verification_service import LawyerVerificationService
 
 User = get_user_model()
 
 
 # -------------------------
-# CLIENT SIGNUP
+# SIGNUP
 # -------------------------
-class ClientSignupView(APIView):
+
+class LawyerSignupView(APIView):
     permission_classes = [AllowAny]
 
     @extend_schema(
-        request=ClientSignupSerializer,
+        request=LawyerSignupSerializer,
         responses={201: dict},
-        tags=["clients"]
+        tags=["lawyers"]
     )
     @transaction.atomic
     def post(self, request):
-        serializer = ClientSignupSerializer(data=request.data)
+        serializer = LawyerSignupSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
-        if User.objects.filter(email=serializer.validated_data["email"]).exists():
+        data = serializer.validated_data
+        verification_data = data.pop("verification")
+
+        if User.objects.filter(email=data["email"]).exists():
             return Response(
                 {"error": "Email already registered"},
                 status=400
             )
 
+        # 1️⃣ Create User
         user = User.objects.create_user(
-            email=serializer.validated_data["email"],
-            password=serializer.validated_data["password"],
-            role=UserRoles.CLIENT,
-            is_email_verified=False
+            email=data["email"],
+            password=data["password"],
+            role=UserRoles.LAWYER,
+            is_email_verified=False,
         )
 
-        Client.objects.create(user=user)
+        # 2️⃣ Create Lawyer profile
+        Lawyer.objects.create(user=user)
 
+        # 3️⃣ Create Bar Verification (PENDING)
+        BarVerification.objects.create(
+            user=user,
+            status=BarVerification.Status.PENDING,
+            **verification_data
+        )
+
+        # 4️⃣ Send email verification
         AuthService.send_signup_verification(
             user=user,
-            client_type=serializer.validated_data["client_type"]
+            client_type=data["client_type"]
         )
 
         return Response(
-            {"message": "Client signup successful. Please verify your email."},
+            {
+                "message": "Lawyer signup successful. Verification submitted.",
+                "verification_status": BarVerification.Status.PENDING,
+            },
             status=201
         )
 
 
 # -------------------------
-# CLIENT: SUBMIT / RESUBMIT
+# LAWYER: SUBMIT / RESUBMIT BAR VERIFICATION
 # -------------------------
-class IDVerificationView(APIView):
-    permission_classes = [IsAuthenticated, IsClientUser]
+class BarVerificationView(APIView):
+    permission_classes = [IsAuthenticated, IsLawyerUser]
 
     @extend_schema(
-        request=IDVerificationSerializer,
+        request=BarVerificationSerializer,
         responses={201: dict},
-        tags=["clients"]
+        tags=["lawyers"]
     )
     def post(self, request):
-        serializer = IDVerificationSerializer(data=request.data)
+        serializer = BarVerificationSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
-        verification = ClientVerificationService.submit(
+        verification = LawyerVerificationService.submit(
             user=request.user,
             **serializer.validated_data
         )
 
         return Response(
             {
-                "message": "ID verification submitted successfully",
+                "message": "Bar verification submitted",
                 "status": verification.status,
             },
             status=201
@@ -97,43 +114,43 @@ class IDVerificationView(APIView):
 
 
 # -------------------------
-# CLIENT: VIEW STATUS
+# LAWYER: VIEW OWN STATUS
 # -------------------------
-class IDVerificationMeView(APIView):
-    permission_classes = [IsAuthenticated, IsClientUser]
+class BarVerificationMeView(APIView):
+    permission_classes = [IsAuthenticated, IsLawyerUser]
 
     @extend_schema(
-        tags=["clients"]
+        tags=["lawyers"]
     )
 
     def get(self, request):
-        verification = IDVerification.objects.filter(
+        verification = BarVerification.objects.filter(
             user=request.user
         ).first()
 
         if not verification:
             return Response(
-                {"status": IDVerification.Status.NOT_SUBMITTED},
+                {"status": BarVerification.Status.NOT_SUBMITTED},
                 status=200
             )
 
-        serializer = IDVerificationMeSerializer(verification)
+        serializer = BarVerificationMeSerializer(verification)
         return Response(serializer.data, status=200)
 
 
 # -------------------------
-# ADMIN: LIST
+# ADMIN: LIST / ACTIONS
 # -------------------------
-class IDVerificationListView(APIView):
+class BarVerificationListView(APIView):
     permission_classes = [IsAuthenticated, IsAdminUser]
 
     @extend_schema(
-        tags=["clients"]
+        tags=["lawyers"]
     )
 
     def get(self, request):
+        qs = BarVerification.objects.all()
         status = request.query_params.get("status")
-        qs = IDVerification.objects.all()
 
         if status:
             qs = qs.filter(status=status)
@@ -152,31 +169,28 @@ class IDVerificationListView(APIView):
         )
 
 
-# -------------------------
-# ADMIN: APPROVE / REJECT
-# -------------------------
-class IDVerificationActionView(APIView):
+class BarVerificationActionView(APIView):
     permission_classes = [IsAuthenticated, IsAdminUser]
 
     @extend_schema(
-        tags=["clients"]
+        tags=["lawyers"]
     )
 
     def post(self, request, verification_id, action):
         verification = get_object_or_404(
-            IDVerification,
+            BarVerification,
             id=verification_id
         )
 
         if action == "approve":
-            ClientVerificationService.approve(verification)
-            return Response({"message": "Client verified successfully"}, status=200)
+            LawyerVerificationService.approve(verification)
+            return Response({"message": "Lawyer verified"}, status=200)
 
         if action == "reject":
-            ClientVerificationService.reject(
+            LawyerVerificationService.reject(
                 verification,
                 request.data.get("reason")
             )
-            return Response({"message": "Client verification rejected"}, status=200)
+            return Response({"message": "Lawyer rejected"}, status=200)
 
         return Response({"error": "Invalid action"}, status=400)

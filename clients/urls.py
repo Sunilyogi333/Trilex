@@ -1,25 +1,27 @@
+# clients/api/urls.py
+
 from django.urls import path
+
 from clients.api.views import (
-    ClientIDVerificationView,
-    ClientIDVerificationMeView
-)
-from clients.api.admin_views import (
-    AdminClientVerificationListView,
-    AdminClientVerificationActionView
+    ClientSignupView,
+    IDVerificationView,
+    IDVerificationMeView,
+    IDVerificationListView,
+    IDVerificationActionView,
 )
 
 urlpatterns = [
-    # client
-    path("id-verification/", ClientIDVerificationView.as_view()),
-    path("id-verification/me/", ClientIDVerificationMeView.as_view()),
+    # signup
+    path("signup/", ClientSignupView.as_view()),
+
+    # client verification
+    path("id-verification/", IDVerificationView.as_view()),
+    path("id-verification/me/", IDVerificationMeView.as_view()),
 
     # admin
+    path("id-verifications/", IDVerificationListView.as_view()),
     path(
-        "admin/id-verifications/",
-        AdminClientVerificationListView.as_view()
-    ),
-    path(
-        "admin/id-verifications/<uuid:verification_id>/<str:action>/",
-        AdminClientVerificationActionView.as_view()
+        "id-verifications/<uuid:verification_id>/<str:action>/",
+        IDVerificationActionView.as_view()
     ),
 ]

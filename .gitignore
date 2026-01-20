@@ -22,7 +22,6 @@ db.sqlite3
 
 # Static & media (optional for now)
 staticfiles/
-media/
 
 # OS files
 .DS_Store
