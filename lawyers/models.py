@@ -4,14 +4,15 @@ from django.conf import settings
 from django.db import models
 from base.models import AbstractBaseModel
 from media.models import Image
+from base.constants.verification import VerificationStatus
+from case.models import CaseCategory
 
 User = settings.AUTH_USER_MODEL
-
 
 class Lawyer(AbstractBaseModel):
     """
     Lawyer profile.
-    Only mutable / operational fields.
+    Mutable / operational fields only.
     """
     user = models.OneToOneField(
         User,
@@ -22,6 +23,12 @@ class Lawyer(AbstractBaseModel):
     phone_number = models.CharField(max_length=20, blank=True)
     address = models.TextField(blank=True)
 
+    # ✅ Services lawyer provides
+    services = models.ManyToManyField(
+        CaseCategory,
+        related_name="lawyers"
+    )
+
     def __str__(self):
         return f"Lawyer({self.user.email})"
 
@@ -31,12 +38,6 @@ class BarVerification(AbstractBaseModel):
     Lawyer bar verification.
     Source of truth for lawyer identity.
     """
-
-    class Status(models.TextChoices):
-        NOT_SUBMITTED = "NOT_SUBMITTED", "Not Submitted"
-        PENDING = "PENDING", "Pending"
-        VERIFIED = "VERIFIED", "Verified"
-        REJECTED = "REJECTED", "Rejected"
 
     user = models.OneToOneField(
         User,
@@ -60,8 +61,8 @@ class BarVerification(AbstractBaseModel):
     # lifecycle
     status = models.CharField(
         max_length=20,
-        choices=Status.choices,
-        default=Status.PENDING
+        choices=VerificationStatus.choices,
+        default=VerificationStatus.PENDING
     )
     rejection_reason = models.TextField(
         blank=True,

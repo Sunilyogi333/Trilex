@@ -7,8 +7,7 @@ from accounts.api.views import (
     ResendVerificationLinkView,
     ForgotPasswordView,
     VerifyForgotPasswordOTPView,
-    ResetPasswordView,
-    MeView
+    ResetPasswordView
 )
 
 urlpatterns = [
@@ -20,6 +19,4 @@ urlpatterns = [
     path("forgot-password/", ForgotPasswordView.as_view()),
     path("verify-forgot-password-otp/", VerifyForgotPasswordOTPView.as_view()),
     path("reset-password/", ResetPasswordView.as_view()),
-    path("me/", MeView.as_view()),
-
 ]

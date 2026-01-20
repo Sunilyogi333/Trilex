@@ -1,7 +1,7 @@
 # accounts/permissions.py
 
 from rest_framework.permissions import BasePermission
-from accounts.constants import UserRoles
+from base.constants.user_roles import UserRoles
 
 
 # -------------------------------------------------

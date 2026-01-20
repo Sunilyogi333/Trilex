@@ -1,5 +1,5 @@
 from django.contrib.auth.models import BaseUserManager
-from accounts.constants import UserRoles
+from base.constants.user_roles import UserRoles
 
 
 class UserManager(BaseUserManager):

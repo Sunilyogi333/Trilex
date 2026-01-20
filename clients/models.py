@@ -3,6 +3,8 @@ from django.db import models
 
 from base.models import AbstractBaseModel
 from media.models import Image
+from base.constants.verification import VerificationStatus
+from base.constants.client_id_type import ClientIDType
 
 User = settings.AUTH_USER_MODEL
 
@@ -31,18 +33,6 @@ class IDVerification(AbstractBaseModel):
     Client identity verification (KYC).
     Source of truth for legal identity.
     """
-
-    class Status(models.TextChoices):
-        NOT_SUBMITTED = "NOT_SUBMITTED", "Not Submitted"
-        PENDING = "PENDING", "Pending"
-        VERIFIED = "VERIFIED", "Verified"
-        REJECTED = "REJECTED", "Rejected"
-
-    class IDType(models.TextChoices):
-        PASSPORT = "PASSPORT", "Passport"
-        NATIONAL_ID = "NATIONAL_ID", "National ID"
-        CITIZENSHIP = "CITIZENSHIP", "Citizenship"
-
     user = models.OneToOneField(
         User,
         on_delete=models.CASCADE,
@@ -55,7 +45,7 @@ class IDVerification(AbstractBaseModel):
 
     id_type = models.CharField(
         max_length=30,
-        choices=IDType.choices
+        choices=ClientIDType.choices
     )
 
     passport_size_photo = models.OneToOneField(
@@ -82,8 +72,8 @@ class IDVerification(AbstractBaseModel):
     # ---- Verification lifecycle ----
     status = models.CharField(
         max_length=20,
-        choices=Status.choices,
-        default=Status.PENDING
+        choices=VerificationStatus.choices,
+        default=VerificationStatus.PENDING
     )
     rejection_reason = models.TextField(
         blank=True,

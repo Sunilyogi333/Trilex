@@ -1,23 +1,71 @@
-# clients/api/serializers.py
-
 from rest_framework import serializers
+from django.contrib.auth import get_user_model
 from django.contrib.auth.password_validation import validate_password
 
-from clients.models import IDVerification
-from media.api.serializers import ImageSerializer
+from clients.models import Client, IDVerification
 from media.models import Image
+from media.api.serializers import ImageSerializer
 
+User = get_user_model()
+
+# -------------------------
+# USER
+# -------------------------
+class ClientUserSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = User
+        fields = ("email", "role")
 
 
 # -------------------------
-# Client Signup
+# PROFILE
+# -------------------------
+class ClientProfileSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Client
+        fields = (
+            "phone_number",
+            "address",
+        )
+
+
+class ClientProfileUpdateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Client
+        fields = (
+            "phone_number",
+            "address",
+        )
+
+
+# -------------------------
+# VERIFICATION (ME)
+# -------------------------
+class ClientVerificationStatusSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = IDVerification
+        fields = (
+            "status",
+            "rejection_reason",
+        )
+
+
+# -------------------------
+# ME AGGREGATE
+# -------------------------
+class ClientMeSerializer(serializers.Serializer):
+    user = ClientUserSerializer()
+    profile = ClientProfileSerializer()
+    verification = ClientVerificationStatusSerializer(allow_null=True)
+
+
+# -------------------------
+# SIGNUP
 # -------------------------
 class ClientSignupSerializer(serializers.Serializer):
     email = serializers.EmailField()
     password = serializers.CharField(write_only=True)
-    client_type = serializers.ChoiceField(
-        choices=["mobile", "web"]
-    )
+    client_type = serializers.ChoiceField(choices=["mobile", "web"])
 
     def validate_password(self, value):
         validate_password(value)
@@ -25,12 +73,8 @@ class ClientSignupSerializer(serializers.Serializer):
 
 
 # -------------------------
-# Client ID Verification
+# VERIFICATION INPUT
 # -------------------------
-# clients/api/serializers.py
-
-
-
 class IDVerificationSerializer(serializers.ModelSerializer):
     passport_size_photo = serializers.PrimaryKeyRelatedField(
         queryset=Image.objects.all()
@@ -54,10 +98,6 @@ class IDVerificationSerializer(serializers.ModelSerializer):
         )
 
 
-
-# clients/api/serializers.py
-
-
 class IDVerificationMeSerializer(serializers.ModelSerializer):
     passport_size_photo = ImageSerializer(read_only=True)
     photo_front = ImageSerializer(read_only=True)
@@ -75,3 +115,48 @@ class IDVerificationMeSerializer(serializers.ModelSerializer):
             "photo_front",
             "photo_back",
         )
+
+
+# -------------------------
+# PUBLIC / ADMIN SERIALIZERS
+# -------------------------
+class ClientPublicVerificationSerializer(serializers.ModelSerializer):
+    passport_size_photo = ImageSerializer(read_only=True)
+
+    class Meta:
+        model = IDVerification
+        fields = (
+            "full_name",
+            "passport_size_photo",
+        )
+
+
+class ClientAdminVerificationSerializer(serializers.ModelSerializer):
+    passport_size_photo = ImageSerializer(read_only=True)
+    photo_front = ImageSerializer(read_only=True)
+    photo_back = ImageSerializer(read_only=True)
+
+    class Meta:
+        model = IDVerification
+        fields = (
+            "full_name",
+            "date_of_birth",
+            "id_type",
+            "status",
+            "rejection_reason",
+            "passport_size_photo",
+            "photo_front",
+            "photo_back",
+        )
+
+
+class ClientPublicSerializer(serializers.Serializer):
+    user = ClientUserSerializer()
+    profile = ClientProfileSerializer()
+    verification = ClientPublicVerificationSerializer()
+
+
+class ClientAdminSerializer(serializers.Serializer):
+    user = ClientUserSerializer()
+    profile = ClientProfileSerializer()
+    verification = ClientAdminVerificationSerializer(allow_null=True)

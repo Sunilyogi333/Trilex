@@ -1,6 +1,6 @@
 from rest_framework.views import APIView
 from rest_framework.response import Response
-from rest_framework.permissions import AllowAny, IsAuthenticated
+from rest_framework.permissions import AllowAny
 
 from drf_spectacular.utils import extend_schema
 
@@ -13,7 +13,6 @@ from accounts.api.serializers import (
     ResetPasswordSerializer
 )
 from accounts.services.auth_service import AuthService
-from accounts.api.serializers import MeSerializer
 
 class LoginView(APIView):
     permission_classes = [AllowAny]
@@ -132,13 +131,3 @@ class ResetPasswordView(APIView):
         s.is_valid(raise_exception=True)
         data, status = AuthService.reset_password(**s.validated_data)
         return Response(data, status=status)
-
-class MeView(APIView):
-    permission_classes = [IsAuthenticated]
-    @extend_schema(
-        tags=["auth"]
-    )
-
-    def get(self, request):
-        serializer = MeSerializer(request.user)
-        return Response(serializer.data, status=200)

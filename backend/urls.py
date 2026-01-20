@@ -44,6 +44,7 @@ urlpatterns = [
     path("api/clients/", include("clients.urls")),
     path("api/lawyers/", include("lawyers.urls")),
     path("api/firms/", include("firms.urls")),
-    path("media/", include("media.urls"))
+    path("api/cases/", include("case.urls")),
+    path("api/media/", include("media.urls"))
 ]
 

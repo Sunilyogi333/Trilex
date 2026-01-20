@@ -61,7 +61,8 @@ INSTALLED_APPS = [
     "clients",
     "lawyers",
     "firms",
-    "media"
+    "media",
+    "case"
 ]
 
 AUTH_USER_MODEL = "accounts.User"

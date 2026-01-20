@@ -3,7 +3,7 @@ from django.db import models
 
 from accounts.managers import UserManager
 from base.models import AbstractBaseModel
-from accounts.constants import UserRoles
+from base.constants.user_roles import UserRoles
 
 
 class User(AbstractUser, AbstractBaseModel):

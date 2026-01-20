@@ -2,7 +2,7 @@ from django.contrib.auth import get_user_model, authenticate
 from django.conf import settings
 from rest_framework.exceptions import AuthenticationFailed
 
-from accounts.constants import UserRoles
+from base.constants.user_roles import UserRoles
 from accounts.services.otp_service import generate_otp_for_user, verify_user_otp
 from accounts.services.email_service import (
     send_signup_otp_email,
