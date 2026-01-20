@@ -71,17 +71,17 @@ class ClientVerificationService:
     # ADMIN: REJECT
     # -------------------------
     @staticmethod
-    def reject(verification: IDVerification, reason: str):
+    def reject(verification: IDVerification, rejection_reason: str):
         if verification.status == VerificationStatus.VERIFIED:
             raise ValidationError(
                 "Verified client cannot be rejected."
             )
 
-        if not reason:
+        if not rejection_reason:
             raise ValidationError("Rejection reason is required.")
 
         verification.status = VerificationStatus.REJECTED
-        verification.rejection_reason = reason
+        verification.rejection_reason = rejection_reason
         verification.save(update_fields=["status", "rejection_reason"])
 
     # -------------------------

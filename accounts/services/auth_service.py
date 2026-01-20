@@ -75,22 +75,29 @@ class AuthService:
     @staticmethod
     def login(email, password):
         user = authenticate(username=email, password=password)
-
+    
         if not user:
             return {"message": "Invalid credentials"}, 400
-
+    
         if not user.is_email_verified:
-            return {"message": "Email not verified"}, 403
-
+            return {
+                "message": "Email not verified",
+                "email": user.email,
+                "role": user.role,
+                "is_email_verified": False,
+            }, 403
+    
         refresh = RefreshToken.for_user(user)
-
+    
         return {
             "message": "Login successful",
+            "email": user.email,
             "role": user.role,
-            "is_email_verified": user.is_email_verified,
+            "is_email_verified": True,
             "access": str(refresh.access_token),
             "refresh": str(refresh),
         }, 200
+    
 
     @staticmethod
     def resend_otp(email):

@@ -58,15 +58,15 @@ class FirmVerificationService:
     # ADMIN: REJECT
     # -------------------------
     @staticmethod
-    def reject(verification: FirmVerification, reason: str):
+    def reject(verification: FirmVerification, rejection_reason: str):
         if verification.status == VerificationStatus.VERIFIED:
             raise ValidationError(
                 "Verified firm cannot be rejected."
             )
 
-        if not reason:
+        if not rejection_reason:
             raise ValidationError("Rejection reason is required.")
 
         verification.status = VerificationStatus.REJECTED
-        verification.rejection_reason = reason
+        verification.rejection_reason = rejection_reason
         verification.save(update_fields=["status", "rejection_reason"])

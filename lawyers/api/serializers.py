@@ -78,16 +78,6 @@ class LawyerVerificationStatusSerializer(serializers.ModelSerializer):
             "rejection_reason",
         )
 
-
-# -------------------------
-# ME AGGREGATE
-# -------------------------
-class LawyerMeSerializer(serializers.Serializer):
-    user = LawyerUserSerializer()
-    profile = LawyerProfileSerializer()
-    verification = LawyerVerificationStatusSerializer(allow_null=True)
-
-
 # -------------------------
 # SIGNUP
 # -------------------------
@@ -167,7 +157,8 @@ class BarVerificationMeSerializer(serializers.ModelSerializer):
             "rejection_reason",
             "license_photo",
         )
-
+class LawyerRejectReasonSerializer(serializers.Serializer):
+    rejection_reason = serializers.CharField(required=True)
 
 # -------------------------
 # PUBLIC / ADMIN LIST & DETAIL
@@ -209,3 +200,8 @@ class LawyerAdminSerializer(serializers.Serializer):
     user = LawyerUserSerializer()
     profile = LawyerProfileSerializer()
     verification = LawyerAdminVerificationSerializer(allow_null=True)
+
+class LawyerMeSerializer(serializers.Serializer):
+    user = LawyerUserSerializer()
+    profile = LawyerProfileSerializer()
+    verification = BarVerificationMeSerializer(allow_null=True)

@@ -26,10 +26,12 @@ from clients.api.serializers import (
     ClientProfileUpdateSerializer,
     IDVerificationSerializer,
     IDVerificationMeSerializer,
+    ClientRejectReasonSerializer,
     ClientPublicSerializer,
     ClientAdminSerializer,
     ClientAdminVerificationSerializer,
 )
+from base.pagination import DefaultPageNumberPagination
 
 User = get_user_model()
 
@@ -192,6 +194,8 @@ class IDVerificationListView(APIView):
         summary="List client verifications (admin)",
         description="Admin-only endpoint to list client ID verifications with optional status filter.",
         parameters=[
+            OpenApiParameter("page", int, OpenApiParameter.QUERY),
+            OpenApiParameter("page_size", int, OpenApiParameter.QUERY),
             OpenApiParameter(
                 name="status",
                 type=str,
@@ -210,8 +214,11 @@ class IDVerificationListView(APIView):
         if status:
             qs = qs.filter(status=status)
 
-        serializer = ClientAdminVerificationSerializer(qs, many=True)
-        return Response(serializer.data, status=200)
+        paginator = DefaultPageNumberPagination()
+        page = paginator.paginate_queryset(qs, request)
+
+        serializer = ClientAdminVerificationSerializer(page, many=True)
+        return paginator.get_paginated_response(serializer.data)
 
 
 # =========================
@@ -232,13 +239,14 @@ class IDVerificationActionView(APIView):
                 type=str,
                 location=OpenApiParameter.PATH,
                 enum=["approve", "reject"],
-                description="Verification action",
             )
         ],
+        request=ClientRejectReasonSerializer,
         responses={
             200: OpenApiResponse(description="Action completed"),
             400: OpenApiResponse(description="Invalid action"),
         },
+        operation_id="client_verification_action",
         tags=["client-verifications"],
     )
     def post(self, request, verification_id, action):
@@ -252,9 +260,12 @@ class IDVerificationActionView(APIView):
             )
 
         if action == "reject":
+            serializer = ClientRejectReasonSerializer(data=request.data)
+            serializer.is_valid(raise_exception=True)
+
             ClientVerificationService.reject(
                 verification,
-                request.data.get("reason"),
+                serializer.validated_data["rejection_reason"],
             )
             return Response(
                 {"message": "Client verification rejected"},
@@ -276,11 +287,18 @@ class ClientListView(APIView):
             "Public users see only verified clients with limited verification data. "
             "Admins see all clients with full verification details."
         ),
+        parameters=[
+            OpenApiParameter("page", int, OpenApiParameter.QUERY),
+            OpenApiParameter("page_size", int, OpenApiParameter.QUERY),
+        ],
+        responses={
+            200: ClientPublicSerializer(many=True),
+        },
+        operation_id="clients_list",
         tags=["clients"],
     )
     def get(self, request):
         admin = is_admin_user(request.user)
-
         qs = Client.objects.select_related("user")
 
         if not admin:
@@ -291,6 +309,9 @@ class ClientListView(APIView):
         else:
             serializer_class = ClientAdminSerializer
 
+        paginator = DefaultPageNumberPagination()
+        page = paginator.paginate_queryset(qs, request)
+
         data = [
             {
                 "user": client.user,
@@ -299,11 +320,11 @@ class ClientListView(APIView):
                     user=client.user
                 ).first(),
             }
-            for client in qs
+            for client in page
         ]
 
         serializer = serializer_class(data, many=True)
-        return Response(serializer.data)
+        return paginator.get_paginated_response(serializer.data)
 
 
 class ClientDetailView(APIView):
@@ -315,6 +336,8 @@ class ClientDetailView(APIView):
             "Public users can view only verified clients. "
             "Admins can view all clients with full verification data."
         ),
+        responses={200: ClientPublicSerializer},
+        operation_id="clients_retrieve",
         tags=["clients"],
     )
     def get(self, request, client_id):

@@ -86,16 +86,6 @@ class FirmVerificationStatusSerializer(serializers.ModelSerializer):
             "rejection_reason",
         )
 
-
-# -------------------------
-# ME AGGREGATE
-# -------------------------
-class FirmMeSerializer(serializers.Serializer):
-    user = FirmUserSerializer()
-    profile = FirmProfileSerializer()
-    verification = FirmVerificationStatusSerializer(allow_null=True)
-
-
 # -------------------------
 # SIGNUP
 # -------------------------
@@ -160,7 +150,9 @@ class FirmVerificationMeSerializer(serializers.ModelSerializer):
             "firm_license",
         )
 
-
+class FirmRejectReasonSerializer(serializers.Serializer):
+    rejection_reason = serializers.CharField(required=True)
+    
 # -------------------------
 # PUBLIC / ADMIN LIST & DETAIL
 # -------------------------
@@ -200,3 +192,8 @@ class FirmAdminSerializer(serializers.Serializer):
     user = FirmUserSerializer()
     profile = FirmProfileSerializer()
     verification = FirmAdminVerificationSerializer(allow_null=True)
+
+class FirmMeSerializer(serializers.Serializer):
+    user = FirmUserSerializer()
+    profile = FirmProfileSerializer()
+    verification = FirmVerificationMeSerializer(allow_null=True)

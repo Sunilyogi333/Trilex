@@ -25,6 +25,7 @@ from lawyers.api.serializers import (
     LawyerSignupSerializer,
     BarVerificationSerializer,
     BarVerificationMeSerializer,
+    LawyerRejectReasonSerializer,
     LawyerMeSerializer,
     LawyerProfileUpdateSerializer,
     LawyerPublicSerializer,
@@ -32,6 +33,7 @@ from lawyers.api.serializers import (
     LawyerAdminVerificationSerializer,
 )
 from addresses.services.address_service import AddressService
+from base.pagination import DefaultPageNumberPagination
 
 User = get_user_model()
 
@@ -97,7 +99,7 @@ class LawyerSignupView(APIView):
         )
 
         return Response(
-            {"message": "Lawyer signup successful. Verification submitted."},
+            {"message": "Lawyer signup successful. Please verify your email."},
             status=201
         )
 
@@ -224,8 +226,9 @@ class BarVerificationListView(APIView):
                 type=str,
                 location=OpenApiParameter.QUERY,
                 enum=[v for v, _ in VerificationStatus.choices],
-                description="Filter by verification status",
-            )
+            ),
+            OpenApiParameter("page", int, OpenApiParameter.QUERY),
+            OpenApiParameter("page_size", int, OpenApiParameter.QUERY),
         ],
         responses={200: LawyerAdminVerificationSerializer(many=True)},
         tags=["lawyer-verifications"],
@@ -237,9 +240,11 @@ class BarVerificationListView(APIView):
         if status:
             qs = qs.filter(status=status)
 
-        serializer = LawyerAdminVerificationSerializer(qs, many=True)
-        return Response(serializer.data)
+        paginator = DefaultPageNumberPagination()
+        page = paginator.paginate_queryset(qs, request)
 
+        serializer = LawyerAdminVerificationSerializer(page, many=True)
+        return paginator.get_paginated_response(serializer.data)
 
 class BarVerificationActionView(APIView):
     permission_classes = [IsAuthenticated, IsAdminUser]
@@ -256,13 +261,14 @@ class BarVerificationActionView(APIView):
                 type=str,
                 location=OpenApiParameter.PATH,
                 enum=["approve", "reject"],
-                description="Verification action",
             )
         ],
+        request=LawyerRejectReasonSerializer,
         responses={
             200: OpenApiResponse(description="Action completed"),
             400: OpenApiResponse(description="Invalid action"),
         },
+        operation_id="lawyer_verification_action",
         tags=["lawyer-verifications"],
     )
     def post(self, request, verification_id, action):
@@ -276,8 +282,13 @@ class BarVerificationActionView(APIView):
             )
 
         if action == "reject":
-            reason = request.data.get("reason")
-            LawyerVerificationService.reject(verification, reason)
+            serializer = LawyerRejectReasonSerializer(data=request.data)
+            serializer.is_valid(raise_exception=True)
+
+            LawyerVerificationService.reject(
+                verification,
+                serializer.validated_data["rejection_reason"],
+            )
             return Response(
                 {"message": "Lawyer verification rejected"},
                 status=200
@@ -298,7 +309,13 @@ class LawyerListView(APIView):
             "Public users see only verified lawyers with limited verification data. "
             "Admins see all lawyers with full verification details."
         ),
-        tags=["lawyers"],
+        parameters=[
+            OpenApiParameter("page", int, OpenApiParameter.QUERY),
+            OpenApiParameter("page_size", int, OpenApiParameter.QUERY),
+        ],
+        responses={200: LawyerPublicSerializer(many=True)},
+        operation_id="lawyers_list",
+            tags=["lawyers"],
     )
     def get(self, request):
         admin = is_admin_user(request.user)
@@ -317,17 +334,21 @@ class LawyerListView(APIView):
         else:
             serializer_class = LawyerAdminSerializer
 
+        paginator = DefaultPageNumberPagination()
+        page = paginator.paginate_queryset(qs, request)
+
         data = [
             {
                 "user": lawyer.user,
                 "profile": lawyer,
                 "verification": getattr(lawyer.user, "bar_verification", None),
             }
-            for lawyer in qs
+            for lawyer in page
         ]
 
         serializer = serializer_class(data, many=True)
-        return Response(serializer.data)
+        return paginator.get_paginated_response(serializer.data)
+
 
 
 class LawyerDetailView(APIView):
@@ -339,6 +360,8 @@ class LawyerDetailView(APIView):
             "Public users can view only verified lawyers. "
             "Admins can view all lawyers with full verification data."
         ),
+        responses={200: LawyerPublicSerializer},
+        operation_id="lawyers_retrieve",
         tags=["lawyers"],
     )
     def get(self, request, lawyer_id):

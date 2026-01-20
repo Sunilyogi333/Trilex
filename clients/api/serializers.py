@@ -54,10 +54,7 @@ class ClientVerificationStatusSerializer(serializers.ModelSerializer):
 # -------------------------
 # ME AGGREGATE
 # -------------------------
-class ClientMeSerializer(serializers.Serializer):
-    user = ClientUserSerializer()
-    profile = ClientProfileSerializer()
-    verification = ClientVerificationStatusSerializer(allow_null=True)
+
 
 
 # -------------------------
@@ -117,6 +114,8 @@ class IDVerificationMeSerializer(serializers.ModelSerializer):
             "photo_back",
         )
 
+class ClientRejectReasonSerializer(serializers.Serializer):
+    rejection_reason = serializers.CharField(required=True)
 
 # -------------------------
 # PUBLIC / ADMIN SERIALIZERS
@@ -161,3 +160,8 @@ class ClientAdminSerializer(serializers.Serializer):
     user = ClientUserSerializer()
     profile = ClientProfileSerializer()
     verification = ClientAdminVerificationSerializer(allow_null=True)
+
+class ClientMeSerializer(serializers.Serializer):
+    user = ClientUserSerializer()
+    profile = ClientProfileSerializer()
+    verification = IDVerificationMeSerializer(allow_null=True)

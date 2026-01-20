@@ -18,15 +18,18 @@ from firms.api.serializers import (
     FirmSignupSerializer,
     FirmVerificationSerializer,
     FirmVerificationMeSerializer,
+    FirmRejectReasonSerializer,
     FirmProfileUpdateSerializer,
     FirmMeSerializer,
     FirmPublicSerializer,
     FirmAdminSerializer,
     FirmAdminVerificationSerializer
+
 )
 from firms.services.firm_profile_service import FirmProfileService
 from firms.services.verification_service import FirmVerificationService
 from addresses.services.address_service import AddressService
+from base.pagination import DefaultPageNumberPagination
 
 User = get_user_model()
 
@@ -95,7 +98,7 @@ class FirmSignupView(APIView):
         )
 
         return Response(
-            {"message": "Firm signup successful. Verification submitted."},
+            {"message": "Firm signup successful. Please verify your email."},
             status=201
         )
 
@@ -220,13 +223,14 @@ class FirmVerificationActionView(APIView):
                 type=str,
                 location=OpenApiParameter.PATH,
                 enum=["approve", "reject"],
-                description="Verification action",
             )
         ],
+        request=FirmRejectReasonSerializer,
         responses={
             200: OpenApiResponse(description="Action completed"),
             400: OpenApiResponse(description="Invalid action"),
         },
+        operation_id="firm_verification_action",
         tags=["firm-verifications"],
     )
     def post(self, request, verification_id, action):
@@ -243,8 +247,13 @@ class FirmVerificationActionView(APIView):
             )
 
         if action == "reject":
-            reason = request.data.get("reason")
-            FirmVerificationService.reject(verification, reason)
+            serializer = FirmRejectReasonSerializer(data=request.data)
+            serializer.is_valid(raise_exception=True)
+
+            FirmVerificationService.reject(
+                verification,
+                serializer.validated_data["rejection_reason"],
+            )
             return Response(
                 {"message": "Firm verification rejected"},
                 status=200
@@ -254,6 +263,7 @@ class FirmVerificationActionView(APIView):
             {"error": "Invalid action"},
             status=400
         )
+
 
 # -------------------------
 # LIST & DETAIL
@@ -267,18 +277,25 @@ class FirmListView(APIView):
             "Public users see only verified firms. "
             "Admins see all firms with full verification details."
         ),
-        responses={
-            200: FirmPublicSerializer(many=True)
-        },
+        parameters=[
+            OpenApiParameter("page", int, OpenApiParameter.QUERY),
+            OpenApiParameter("page_size", int, OpenApiParameter.QUERY),
+        ],
+        responses={200: FirmPublicSerializer(many=True)},
         tags=["firms"],
     )
     def get(self, request):
         admin = is_admin_user(request.user)
-        qs = Firm.objects.select_related(
-            "user",
-            "address",
-            "user__firm_verification",
-        ).prefetch_related("services")
+
+        qs = (
+            Firm.objects
+            .select_related(
+                "user",
+                "address",
+                "user__firm_verification",
+            )
+            .prefetch_related("services")
+        )
 
         if not admin:
             qs = qs.filter(
@@ -288,17 +305,21 @@ class FirmListView(APIView):
         else:
             serializer_class = FirmAdminSerializer
 
+        paginator = DefaultPageNumberPagination()
+        page = paginator.paginate_queryset(qs, request)
+
         data = [
             {
                 "user": firm.user,
                 "profile": firm,
                 "verification": getattr(firm.user, "firm_verification", None),
             }
-            for firm in qs
+            for firm in page
         ]
 
         serializer = serializer_class(data, many=True)
-        return Response(serializer.data)
+        return paginator.get_paginated_response(serializer.data)
+
 
 # -------------------------
 # ADMIN: LIST VERIFICATIONS
@@ -315,12 +336,11 @@ class FirmVerificationListView(APIView):
                 type=str,
                 location=OpenApiParameter.QUERY,
                 enum=[v for v, _ in VerificationStatus.choices],
-                description="Filter by verification status",
-            )
+            ),
+            OpenApiParameter("page", int, OpenApiParameter.QUERY),
+            OpenApiParameter("page_size", int, OpenApiParameter.QUERY),
         ],
-        responses={
-            200: FirmAdminVerificationSerializer(many=True)
-        },
+        responses={200: FirmAdminVerificationSerializer(many=True)},
         tags=["firm-verifications"],
     )
     def get(self, request):
@@ -330,8 +350,11 @@ class FirmVerificationListView(APIView):
         if status:
             qs = qs.filter(status=status)
 
-        serializer = FirmAdminVerificationSerializer(qs, many=True)
-        return Response(serializer.data, status=200)
+        paginator = DefaultPageNumberPagination()
+        page = paginator.paginate_queryset(qs, request)
+
+        serializer = FirmAdminVerificationSerializer(page, many=True)
+        return paginator.get_paginated_response(serializer.data)
 
 
 class FirmDetailView(APIView):

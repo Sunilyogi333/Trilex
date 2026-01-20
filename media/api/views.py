@@ -14,6 +14,8 @@ class ImageUploadView(APIView):
     parser_classes = [MultiPartParser, FormParser]
 
     @extend_schema(
+        summary="Upload image",
+        description="Upload an image file and return its ID and URL.",
         request={
             "multipart/form-data": {
                 "type": "object",
