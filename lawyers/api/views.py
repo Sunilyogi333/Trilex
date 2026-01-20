@@ -31,6 +31,7 @@ from lawyers.api.serializers import (
     LawyerAdminSerializer,
     LawyerAdminVerificationSerializer,
 )
+from addresses.services.address_service import AddressService
 
 User = get_user_model()
 
@@ -63,18 +64,25 @@ class LawyerSignupView(APIView):
         data = serializer.validated_data
         verification_data = data.pop("verification")
         services = data.pop("services")
+        address_data = data.pop("address")
 
         if User.objects.filter(email=data["email"]).exists():
             return Response({"error": "Email already registered"}, status=400)
-
+        
         user = User.objects.create_user(
             email=data["email"],
             password=data["password"],
             role=UserRoles.LAWYER,
             is_email_verified=False,
         )
-
-        lawyer = Lawyer.objects.create(user=user)
+        
+        address = AddressService.create(address_data)
+        
+        lawyer = Lawyer.objects.create(
+            user=user,
+            address=address,
+        )
+        
         lawyer.services.set(services)
 
         BarVerification.objects.create(
@@ -107,7 +115,12 @@ class LawyerMeView(APIView):
         tags=["lawyers"],
     )
     def get(self, request):
-        lawyer = request.user.lawyer_profile
+        lawyer = (
+            Lawyer.objects
+            .select_related("address")
+            .prefetch_related("services")
+            .get(user=request.user)
+        )
         verification = getattr(request.user, "bar_verification", None)
 
         serializer = LawyerMeSerializer({
@@ -131,7 +144,9 @@ class LawyerProfileUpdateView(APIView):
         tags=["lawyers"],
     )
     def patch(self, request):
-        lawyer = request.user.lawyer_profile
+        lawyer = Lawyer.objects.select_related("address").get(
+            user=request.user
+        )
 
         serializer = LawyerProfileUpdateSerializer(
             lawyer, data=request.data, partial=True
@@ -290,7 +305,8 @@ class LawyerListView(APIView):
 
         qs = Lawyer.objects.select_related(
             "user",
-            "user__bar_verification"
+            "address",
+            "user__bar_verification",
         ).prefetch_related("services")
 
         if not admin:
@@ -330,8 +346,10 @@ class LawyerDetailView(APIView):
 
         qs = Lawyer.objects.select_related(
             "user",
-            "user__bar_verification"
+            "address",
+            "user__bar_verification",
         ).prefetch_related("services")
+
 
         if not admin:
             lawyer = get_object_or_404(

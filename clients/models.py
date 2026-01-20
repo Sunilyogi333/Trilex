@@ -5,6 +5,8 @@ from base.models import AbstractBaseModel
 from media.models import Image
 from base.constants.verification import VerificationStatus
 from base.constants.client_id_type import ClientIDType
+from addresses.models.address import Address
+
 
 User = settings.AUTH_USER_MODEL
 
@@ -22,8 +24,12 @@ class Client(AbstractBaseModel):
     )
 
     phone_number = models.CharField(max_length=20, blank=True)
-    address = models.TextField(blank=True)
-
+    address = models.OneToOneField(
+        Address,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True
+    )
     def __str__(self):
         return f"Client({self.user.email})"
 

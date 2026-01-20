@@ -5,6 +5,8 @@ from django.contrib.auth.password_validation import validate_password
 from clients.models import Client, IDVerification
 from media.models import Image
 from media.api.serializers import ImageSerializer
+from addresses.api.serializers import AddressInputSerializer, AddressSerializer
+
 
 User = get_user_model()
 
@@ -21,6 +23,8 @@ class ClientUserSerializer(serializers.ModelSerializer):
 # PROFILE
 # -------------------------
 class ClientProfileSerializer(serializers.ModelSerializer):
+    address = AddressSerializer(read_only=True)
+
     class Meta:
         model = Client
         fields = (
@@ -29,13 +33,10 @@ class ClientProfileSerializer(serializers.ModelSerializer):
         )
 
 
-class ClientProfileUpdateSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = Client
-        fields = (
-            "phone_number",
-            "address",
-        )
+
+class ClientProfileUpdateSerializer(serializers.Serializer):
+    phone_number = serializers.CharField(required=False)
+    address = AddressInputSerializer(required=False)
 
 
 # -------------------------

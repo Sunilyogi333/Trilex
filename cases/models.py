@@ -7,7 +7,7 @@ class CaseCategory(AbstractBaseModel):
     is_active = models.BooleanField(default=True)
 
     class Meta:
-        db_table = "case_categories"
+        db_table = "cases_categories"
         ordering = ["name"]
 
     def __str__(self):

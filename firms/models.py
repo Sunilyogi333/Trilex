@@ -5,7 +5,8 @@ from django.db import models
 from base.models import AbstractBaseModel
 from media.models import Image
 from base.constants.verification import VerificationStatus
-from case.models import CaseCategory
+from cases.models import CaseCategory
+from addresses.models import Address
 
 User = settings.AUTH_USER_MODEL
 
@@ -22,8 +23,11 @@ class Firm(AbstractBaseModel):
     )
 
     phone_number = models.CharField(max_length=20, blank=True)
-    address = models.TextField(blank=True)
-        # ✅ Services firm provides
+    address = models.OneToOneField(
+        Address,
+        on_delete=models.PROTECT,
+        related_name="firm",
+    )
     services = models.ManyToManyField(
         CaseCategory,
         related_name="firms"

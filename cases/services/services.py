@@ -1,4 +1,4 @@
-from case.models import CaseCategory
+from cases.models import CaseCategory
 
 class CaseCategoryService:
 

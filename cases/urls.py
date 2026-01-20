@@ -1,6 +1,6 @@
 from django.urls import path
 
-from case.api.views import (
+from cases.api.views import (
     CaseCategoryListCreateAPIView,
     CaseCategoryDetailAPIView,
 )
@@ -9,11 +9,11 @@ urlpatterns = [
     path(
         "categories/",
         CaseCategoryListCreateAPIView.as_view(),
-        name="case-category-list-create",
+        name="cases-category-list-create",
     ),
     path(
         "categories/<uuid:pk>/",
         CaseCategoryDetailAPIView.as_view(),
-        name="case-category-detail",
+        name="cases-category-detail",
     ),
 ]

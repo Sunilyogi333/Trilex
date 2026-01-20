@@ -5,9 +5,9 @@ from rest_framework.permissions import AllowAny
 from django.shortcuts import get_object_or_404
 from drf_spectacular.utils import extend_schema
 
-from case.models import CaseCategory
+from cases.models import CaseCategory
 from .serializers import CaseCategorySerializer
-from case.services.services import CaseCategoryService
+from cases.services.services import CaseCategoryService
 from accounts.permissions import IsAdminUser
 
 class CaseCategoryListCreateAPIView(APIView):

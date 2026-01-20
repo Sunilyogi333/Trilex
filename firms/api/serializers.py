@@ -2,9 +2,13 @@ from rest_framework import serializers
 from django.contrib.auth import get_user_model
 
 from firms.models import Firm, FirmVerification
-from case.models import CaseCategory
+from cases.models import CaseCategory
 from media.models import Image
 from media.api.serializers import ImageSerializer
+from addresses.api.serializers import (
+    AddressSerializer,
+    AddressInputSerializer,
+)
 
 User = get_user_model()
 
@@ -32,6 +36,7 @@ class FirmServiceSerializer(serializers.ModelSerializer):
 # -------------------------
 class FirmProfileSerializer(serializers.ModelSerializer):
     services = FirmServiceSerializer(many=True)
+    address = AddressSerializer()
 
     class Meta:
         model = Firm
@@ -41,13 +46,13 @@ class FirmProfileSerializer(serializers.ModelSerializer):
             "services",
         )
 
-
 class FirmProfileUpdateSerializer(serializers.ModelSerializer):
     services = serializers.PrimaryKeyRelatedField(
         queryset=CaseCategory.objects.all(),
         many=True,
         required=False,
     )
+    address = AddressInputSerializer(required=False)
 
     class Meta:
         model = Firm
@@ -64,7 +69,12 @@ class FirmProfileUpdateSerializer(serializers.ModelSerializer):
             )
         return value
 
+    def validate_address(self, value):
+        if not value:
+            raise serializers.ValidationError("Address is required.")
+        return value
 
+    
 # -------------------------
 # VERIFICATION (ME)
 # -------------------------
@@ -112,6 +122,7 @@ class FirmSignupSerializer(serializers.Serializer):
         queryset=CaseCategory.objects.all(),
         many=True
     )
+    address = AddressInputSerializer()
     verification = FirmVerificationInputSerializer()
 
     def validate_services(self, value):

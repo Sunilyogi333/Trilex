@@ -3,9 +3,13 @@ from django.contrib.auth.password_validation import validate_password
 from django.contrib.auth import get_user_model
 
 from lawyers.models import Lawyer, BarVerification
-from case.models import CaseCategory
+from cases.models import CaseCategory
 from media.models import Image
 from media.api.serializers import ImageSerializer
+from addresses.api.serializers import (
+    AddressInputSerializer,
+    AddressSerializer,
+)
 
 User = get_user_model()
 
@@ -33,6 +37,7 @@ class LawyerServiceSerializer(serializers.ModelSerializer):
 # -------------------------
 class LawyerProfileSerializer(serializers.ModelSerializer):
     services = LawyerServiceSerializer(many=True)
+    address = AddressSerializer(read_only=True)
 
     class Meta:
         model = Lawyer
@@ -43,20 +48,16 @@ class LawyerProfileSerializer(serializers.ModelSerializer):
         )
 
 
-class LawyerProfileUpdateSerializer(serializers.ModelSerializer):
+class LawyerProfileUpdateSerializer(serializers.Serializer):
+    phone_number = serializers.CharField(required=False)
+
+    address = AddressInputSerializer(required=False)
+
     services = serializers.PrimaryKeyRelatedField(
         queryset=CaseCategory.objects.all(),
         many=True,
         required=False,
     )
-
-    class Meta:
-        model = Lawyer
-        fields = (
-            "phone_number",
-            "address",
-            "services",
-        )
 
     def validate_services(self, value):
         if value is not None and not value:
@@ -110,10 +111,14 @@ class LawyerSignupSerializer(serializers.Serializer):
     email = serializers.EmailField()
     password = serializers.CharField(write_only=True)
     client_type = serializers.ChoiceField(choices=["mobile", "web"])
+
+    address = AddressInputSerializer()
+
     services = serializers.PrimaryKeyRelatedField(
         queryset=CaseCategory.objects.all(),
         many=True
     )
+
     verification = BarVerificationInputSerializer()
 
     def validate_password(self, value):
@@ -126,6 +131,7 @@ class LawyerSignupSerializer(serializers.Serializer):
                 "At least one service is required."
             )
         return value
+
 
 
 # -------------------------

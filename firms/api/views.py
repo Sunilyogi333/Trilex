@@ -26,6 +26,7 @@ from firms.api.serializers import (
 )
 from firms.services.firm_profile_service import FirmProfileService
 from firms.services.verification_service import FirmVerificationService
+from addresses.services.address_service import AddressService
 
 User = get_user_model()
 
@@ -60,6 +61,8 @@ class FirmSignupView(APIView):
         data = serializer.validated_data
         verification_data = data.pop("verification")
         services = data.pop("services")
+        address_data = data.pop("address")
+        
 
         if User.objects.filter(email=data["email"]).exists():
             return Response({"error": "Email already registered"}, status=400)
@@ -70,8 +73,14 @@ class FirmSignupView(APIView):
             role=UserRoles.FIRM,
             is_email_verified=False,
         )
+                
+        address = AddressService.create(address_data)
 
-        firm = Firm.objects.create(user=user)
+
+        firm = Firm.objects.create(
+            user=user,
+            address=address,
+        )        
         firm.services.set(services)
 
         FirmVerification.objects.create(
@@ -104,13 +113,17 @@ class FirmMeView(APIView):
         tags=["firms"],
     )
     def get(self, request):
-        firm = request.user.firm_profile
-        verification = FirmVerification.objects.filter(user=request.user).first()
+        firm = (
+            Firm.objects
+            .select_related("address", "user__firm_verification")
+            .prefetch_related("services")
+            .get(user=request.user)
+        )
 
         serializer = FirmMeSerializer({
             "user": request.user,
             "profile": firm,
-            "verification": verification,
+            "verification": getattr(request.user, "firm_verification", None),
         })
         return Response(serializer.data)
 
@@ -261,7 +274,11 @@ class FirmListView(APIView):
     )
     def get(self, request):
         admin = is_admin_user(request.user)
-        qs = Firm.objects.select_related("user").prefetch_related("services")
+        qs = Firm.objects.select_related(
+            "user",
+            "address",
+            "user__firm_verification",
+        ).prefetch_related("services")
 
         if not admin:
             qs = qs.filter(
@@ -275,7 +292,7 @@ class FirmListView(APIView):
             {
                 "user": firm.user,
                 "profile": firm,
-                "verification": FirmVerification.objects.filter(user=firm.user).first(),
+                "verification": getattr(firm.user, "firm_verification", None),
             }
             for firm in qs
         ]
@@ -333,7 +350,11 @@ class FirmDetailView(APIView):
     )
     def get(self, request, firm_id):
         admin = is_admin_user(request.user)
-        qs = Firm.objects.select_related("user").prefetch_related("services")
+        qs = Firm.objects.select_related(
+            "user",
+            "address",
+            "user__firm_verification",
+        ).prefetch_related("services")
 
         if not admin:
             firm = get_object_or_404(
@@ -346,11 +367,10 @@ class FirmDetailView(APIView):
             firm = get_object_or_404(qs, id=firm_id)
             serializer_class = FirmAdminSerializer
 
-        verification = FirmVerification.objects.filter(user=firm.user).first()
 
         serializer = serializer_class({
             "user": firm.user,
             "profile": firm,
-            "verification": verification,
+            "verification": getattr(firm.user, "firm_verification", None),
         })
         return Response(serializer.data)
