@@ -79,7 +79,7 @@ class LawyerSignupView(APIView):
 
         BarVerification.objects.create(
             user=user,
-            status=BarVerification.Status.PENDING,
+            status=VerificationStatus.PENDING,
             **verification_data
         )
 
@@ -186,7 +186,7 @@ class BarVerificationMeView(APIView):
         verification = getattr(request.user, "bar_verification", None)
         if not verification:
             return Response(
-                {"status": BarVerification.Status.NOT_SUBMITTED},
+                {"status": VerificationStatus.NOT_SUBMITTED},
                 status=200
             )
 

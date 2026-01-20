@@ -10,6 +10,9 @@ class LawyerVerificationService:
     Handles lawyer bar verification lifecycle.
     """
 
+    # -------------------------
+    # SUBMIT / RESUBMIT
+    # -------------------------
     @staticmethod
     def submit(user, **data):
         verification = BarVerification.objects.filter(user=user).first()
@@ -21,7 +24,7 @@ class LawyerVerificationService:
             if verification.status == VerificationStatus.VERIFIED:
                 raise ValidationError("Lawyer already verified.")
 
-            # rejected → resubmit
+            # REJECTED → resubmit
             for field, value in data.items():
                 setattr(verification, field, value)
 
@@ -36,14 +39,33 @@ class LawyerVerificationService:
             **data
         )
 
+    # -------------------------
+    # ADMIN: APPROVE
+    # -------------------------
     @staticmethod
     def approve(verification: BarVerification):
+        if verification.status == VerificationStatus.VERIFIED:
+            raise ValidationError("Lawyer already verified.")
+
+        if verification.status == VerificationStatus.REJECTED:
+            raise ValidationError(
+                "Rejected verification must be resubmitted before approval."
+            )
+
         verification.status = VerificationStatus.VERIFIED
         verification.rejection_reason = None
         verification.save(update_fields=["status", "rejection_reason"])
 
+    # -------------------------
+    # ADMIN: REJECT
+    # -------------------------
     @staticmethod
     def reject(verification: BarVerification, reason: str):
+        if verification.status == VerificationStatus.VERIFIED:
+            raise ValidationError(
+                "Verified lawyer cannot be rejected."
+            )
+
         if not reason:
             raise ValidationError("Rejection reason is required.")
 
