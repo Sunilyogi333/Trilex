@@ -174,7 +174,7 @@ class IDVerificationMeView(APIView):
         verification = IDVerification.objects.filter(user=request.user).first()
         if not verification:
             return Response(
-                {"status": IDVerification.Status.NOT_SUBMITTED},
+                {"status": VerificationStatus.NOT_SUBMITTED},
                 status=200,
             )
 
