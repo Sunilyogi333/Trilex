@@ -85,7 +85,7 @@ class AuthService:
                 "email": user.email,
                 "role": user.role,
                 "is_email_verified": False,
-            }, 403
+            }, 200
     
         refresh = RefreshToken.for_user(user)
     
