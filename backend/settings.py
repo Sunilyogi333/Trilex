@@ -33,7 +33,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 
 # SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = os.environ["SECRET_KEY"]
-
+BREVO_API_KEY = os.environ.get("BREVO_API_KEY")
 JWT_SECRET = os.environ.get("JWT_SECRET")
 FRONTEND_URL = os.environ.get("FRONTEND_URL")
 
@@ -187,19 +187,19 @@ STATIC_URL = "static/"
 
 # Email Configuration
 
-EMAIL_BACKEND = os.environ.get(
-    "EMAIL_BACKEND",
-    "django.core.mail.backends.smtp.EmailBackend",
-)
+# EMAIL_BACKEND = os.environ.get(
+#     "EMAIL_BACKEND",
+#     "django.core.mail.backends.smtp.EmailBackend",
+# )
 
-EMAIL_HOST = os.environ.get("EMAIL_HOST")
-EMAIL_PORT = int(os.environ.get("EMAIL_PORT", 587))
-EMAIL_USE_TLS = os.environ.get("EMAIL_USE_TLS") == "True"
+# EMAIL_HOST = os.environ.get("EMAIL_HOST")
+# EMAIL_PORT = int(os.environ.get("EMAIL_PORT", 587))
+# EMAIL_USE_TLS = os.environ.get("EMAIL_USE_TLS") == "True"
 
-EMAIL_HOST_USER = os.environ.get("EMAIL_HOST_USER")
-EMAIL_HOST_PASSWORD = os.environ.get("EMAIL_HOST_PASSWORD")
+# EMAIL_HOST_USER = os.environ.get("EMAIL_HOST_USER")
+# EMAIL_HOST_PASSWORD = os.environ.get("EMAIL_HOST_PASSWORD")
 
-DEFAULT_FROM_EMAIL = os.environ.get("DEFAULT_FROM_EMAIL")
+# DEFAULT_FROM_EMAIL = os.environ.get("DEFAULT_FROM_EMAIL")
 
 
-DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+# DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
