@@ -20,27 +20,21 @@ class ProvinceSerializer(serializers.ModelSerializer):
 
 
 class DistrictSerializer(serializers.ModelSerializer):
-    province = ProvinceSerializer(read_only=True)
-
     class Meta:
         model = District
-        fields = ["id", "title", "title_nepali", "code", "province"]
+        fields = ["id", "title", "title_nepali", "code"]
 
 
 class MunicipalitySerializer(serializers.ModelSerializer):
-    district = DistrictSerializer(read_only=True)
-
     class Meta:
         model = Municipality
-        fields = ["id", "title", "title_nepali", "code", "district"]
+        fields = ["id", "title", "title_nepali", "code"]
 
 
 class WardSerializer(serializers.ModelSerializer):
-    municipality = MunicipalitySerializer(read_only=True)
-
     class Meta:
         model = Ward
-        fields = ["id", "number", "number_nepali", "municipality"]
+        fields = ["id", "number", "number_nepali"]
 
 
 # =========================
