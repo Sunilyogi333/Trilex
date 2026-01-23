@@ -16,7 +16,9 @@ from accounts.api.serializers import (
 )
 from accounts.services.auth_service import AuthService
 from rest_framework import status
-from django.conf import settings
+from rest_framework_simplejwt.views import TokenRefreshView
+from rest_framework_simplejwt.serializers import TokenRefreshSerializer
+
 User = get_user_model()
 
 class LoginView(APIView):
@@ -191,6 +193,25 @@ class ResetPasswordView(APIView):
         s.is_valid(raise_exception=True)
         data, status = AuthService.reset_password(**s.validated_data)
         return Response(data, status=status)
+
+class RefreshAccessTokenView(TokenRefreshView):
+    permission_classes = [AllowAny]
+    serializer_class = TokenRefreshSerializer
+
+    @extend_schema(
+        summary="Refresh access token",
+        description="Generate a new access token using a valid refresh token.",
+        request=TokenRefreshSerializer,
+        responses={
+            200: OpenApiResponse(description="New access token generated"),
+            401: OpenApiResponse(description="Invalid or expired refresh token"),
+        },
+        operation_id="auth_refresh_token",
+        tags=["auth"],
+    )
+    def post(self, request, *args, **kwargs):
+        return super().post(request, *args, **kwargs)
+
 
 class DevDeleteAccountView(APIView):
     """

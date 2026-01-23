@@ -188,17 +188,20 @@ class FirmAdminVerificationSerializer(serializers.ModelSerializer):
 
 
 class FirmPublicSerializer(serializers.Serializer):
+    id = serializers.UUIDField(source="profile.id", read_only=True)
     user = FirmUserSerializer()
     profile = FirmProfileSerializer()
     verification = FirmPublicVerificationSerializer()
 
 
 class FirmAdminSerializer(serializers.Serializer):
+    id = serializers.UUIDField(source="profile.id", read_only=True)
     user = FirmUserSerializer()
     profile = FirmProfileSerializer()
     verification = FirmAdminVerificationSerializer(allow_null=True)
 
 class FirmMeSerializer(serializers.Serializer):
+    id = serializers.UUIDField(source="profile.id", read_only=True)
     user = FirmUserSerializer()
     profile = FirmProfileSerializer()
     verification = FirmVerificationMeSerializer(allow_null=True)

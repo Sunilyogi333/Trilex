@@ -44,3 +44,5 @@ class UserSerializer(serializers.ModelSerializer):
     class Meta:
         model = get_user_model()
         fields = ("id", "email", "role")
+class RefreshTokenSerializer(serializers.Serializer):
+    refresh = serializers.CharField()

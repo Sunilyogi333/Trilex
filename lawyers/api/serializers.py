@@ -194,17 +194,20 @@ class LawyerAdminVerificationSerializer(serializers.ModelSerializer):
 
 
 class LawyerPublicSerializer(serializers.Serializer):
+    id = serializers.UUIDField(source="profile.id", read_only=True)
     user = LawyerUserSerializer()
     profile = LawyerProfileSerializer()
     verification = LawyerPublicVerificationSerializer()
 
 
 class LawyerAdminSerializer(serializers.Serializer):
+    id = serializers.UUIDField(source="profile.id", read_only=True)
     user = LawyerUserSerializer()
     profile = LawyerProfileSerializer()
     verification = LawyerAdminVerificationSerializer(allow_null=True)
 
 class LawyerMeSerializer(serializers.Serializer):
+    id = serializers.UUIDField(source="profile.id", read_only=True)
     user = LawyerUserSerializer()
     profile = LawyerProfileSerializer()
     verification = BarVerificationMeSerializer(allow_null=True)

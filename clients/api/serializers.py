@@ -153,17 +153,20 @@ class ClientAdminVerificationSerializer(serializers.ModelSerializer):
         )
 
 class ClientPublicSerializer(serializers.Serializer):
+    id = serializers.UUIDField(source="profile.id", read_only=True)
     user = ClientUserSerializer()
     profile = ClientProfileSerializer()
     verification = ClientPublicVerificationSerializer()
 
 
 class ClientAdminSerializer(serializers.Serializer):
+    id = serializers.UUIDField(source="profile.id", read_only=True)
     user = ClientUserSerializer()
     profile = ClientProfileSerializer()
     verification = ClientAdminVerificationSerializer(allow_null=True)
 
 class ClientMeSerializer(serializers.Serializer):
+    id = serializers.UUIDField(source="profile.id", read_only=True)
     user = ClientUserSerializer()
     profile = ClientProfileSerializer()
     verification = IDVerificationMeSerializer(allow_null=True)

@@ -7,11 +7,13 @@ from accounts.api.views import (
     ResendVerificationLinkView,
     ForgotPasswordView,
     VerifyForgotPasswordOTPView,
-    ResetPasswordView
+    ResetPasswordView,
+    RefreshAccessTokenView
 )
 
 urlpatterns = [
     path("login/", LoginView.as_view()),
+    path("refresh/", RefreshAccessTokenView.as_view(), name="token_refresh"),
     path("verify-otp/", VerifyOTPView.as_view()),
     path("verify-link/", VerifyLinkView.as_view()),
     path("resend-otp/", ResendOTPView.as_view()),
