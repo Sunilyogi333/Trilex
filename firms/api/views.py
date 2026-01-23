@@ -174,19 +174,23 @@ class FirmVerificationView(APIView):
         tags=["firm-verifications"],
     )
     def post(self, request):
-        serializer = FirmVerificationSerializer(data=request.data)
+        existing = FirmVerification.objects.filter(user=request.user).first()
+    
+        serializer = FirmVerificationSerializer(
+            instance=existing,
+            data=request.data
+        )
         serializer.is_valid(raise_exception=True)
-
+    
         verification = FirmVerificationService.submit(
             user=request.user,
             **serializer.validated_data
         )
-
+    
         return Response(
             {"message": "Firm verification submitted", "status": verification.status},
             status=201
         )
-
 
 class FirmVerificationMeView(APIView):
     permission_classes = [IsAuthenticated, IsFirmUser]

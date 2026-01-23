@@ -149,18 +149,24 @@ class IDVerificationView(APIView):
         tags=["client-verifications"],
     )
     def post(self, request):
-        serializer = IDVerificationSerializer(data=request.data)
+        existing = IDVerification.objects.filter(user=request.user).first()
+    
+        serializer = IDVerificationSerializer(
+            instance=existing,
+            data=request.data
+        )
         serializer.is_valid(raise_exception=True)
-
+    
         verification = ClientVerificationService.submit(
             user=request.user,
             **serializer.validated_data
         )
-
+    
         return Response(
             {"message": "ID verification submitted", "status": verification.status},
             status=201,
         )
+    
 
 
 class IDVerificationMeView(APIView):

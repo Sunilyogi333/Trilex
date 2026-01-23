@@ -176,18 +176,24 @@ class BarVerificationView(APIView):
         tags=["lawyer-verifications"],
     )
     def post(self, request):
-        serializer = BarVerificationSerializer(data=request.data)
+        existing = BarVerification.objects.filter(user=request.user).first()
+    
+        serializer = BarVerificationSerializer(
+            instance=existing,
+            data=request.data
+        )
         serializer.is_valid(raise_exception=True)
-
+    
         verification = LawyerVerificationService.submit(
             user=request.user,
             **serializer.validated_data
         )
-
+    
         return Response(
             {"message": "Bar verification submitted", "status": verification.status},
             status=201
         )
+    
 
 
 class BarVerificationMeView(APIView):
