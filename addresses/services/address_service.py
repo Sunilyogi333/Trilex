@@ -1,4 +1,3 @@
-# addresses/services/address_service.py
 from rest_framework.exceptions import ValidationError
 from addresses.models import (
     Province, District, Municipality, Ward, Address

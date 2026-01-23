@@ -177,7 +177,7 @@ class FirmAdminVerificationSerializer(serializers.ModelSerializer):
         model = FirmVerification
         fields = (
             "id",
-            "user"
+            "user",
             "firm_name",
             "owner_name",
             "firm_id",
