@@ -6,6 +6,7 @@ from clients.models import Client, IDVerification
 from media.models import Image
 from media.api.serializers import ImageSerializer
 from addresses.api.serializers import AddressInputSerializer, AddressSerializer
+from accounts.api.serializers import UserSerializer
 
 
 User = get_user_model()
@@ -16,8 +17,8 @@ User = get_user_model()
 class ClientUserSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
-        fields = ("email", "role")
-
+        fields = ("id, email", "role")
+        read_only=["id"]
 
 # -------------------------
 # PROFILE
@@ -104,6 +105,7 @@ class IDVerificationMeSerializer(serializers.ModelSerializer):
     class Meta:
         model = IDVerification
         fields = (
+            "id",
             "full_name",
             "date_of_birth",
             "id_type",
@@ -132,6 +134,7 @@ class ClientPublicVerificationSerializer(serializers.ModelSerializer):
 
 
 class ClientAdminVerificationSerializer(serializers.ModelSerializer):
+    user = UserSerializer(read_only=True)
     passport_size_photo = ImageSerializer(read_only=True)
     photo_front = ImageSerializer(read_only=True)
     photo_back = ImageSerializer(read_only=True)
@@ -139,6 +142,8 @@ class ClientAdminVerificationSerializer(serializers.ModelSerializer):
     class Meta:
         model = IDVerification
         fields = (
+            "id",
+            "user",
             "full_name",
             "date_of_birth",
             "id_type",
@@ -148,7 +153,6 @@ class ClientAdminVerificationSerializer(serializers.ModelSerializer):
             "photo_front",
             "photo_back",
         )
-
 
 class ClientPublicSerializer(serializers.Serializer):
     user = ClientUserSerializer()

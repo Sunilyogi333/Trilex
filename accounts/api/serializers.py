@@ -1,6 +1,5 @@
 from rest_framework import serializers
-
-from rest_framework import serializers
+from django.contrib.auth import get_user_model
 
 class LoginSerializer(serializers.Serializer):
     email = serializers.EmailField()
@@ -37,3 +36,11 @@ class ForgotPasswordVerifyOTPSerializer(serializers.Serializer):
 class ResetPasswordSerializer(serializers.Serializer):
     token = serializers.CharField()
     new_password = serializers.CharField(min_length=8, write_only=True)
+
+class DevDeleteAccountSerializer(serializers.Serializer):
+    email = serializers.EmailField()
+
+class UserSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = get_user_model()
+        fields = ("id", "email", "role")

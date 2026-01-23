@@ -10,6 +10,7 @@ from addresses.api.serializers import (
     AddressInputSerializer,
     AddressSerializer,
 )
+from accounts.api.serializers import UserSerializer
 
 User = get_user_model()
 
@@ -173,13 +174,15 @@ class LawyerPublicVerificationSerializer(serializers.ModelSerializer):
             "license_photo",
         )
 
-
 class LawyerAdminVerificationSerializer(serializers.ModelSerializer):
+    user = UserSerializer(read_only=True)
     license_photo = ImageSerializer(read_only=True)
 
     class Meta:
         model = BarVerification
         fields = (
+            "id",
+            "user",
             "full_name",
             "date_of_birth",
             "bar_id",

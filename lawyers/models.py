@@ -25,11 +25,11 @@ class Lawyer(AbstractBaseModel):
 
     address = models.OneToOneField(
         Address,
-        on_delete=models.PROTECT,
+        on_delete=models.CASCADE,
         related_name="lawyer",
     )
 
-    # ✅ Services lawyer provides
+    # Services lawyer provides
     services = models.ManyToManyField(
         CaseCategory,
         related_name="lawyers"

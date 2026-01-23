@@ -25,7 +25,7 @@ class Firm(AbstractBaseModel):
     phone_number = models.CharField(max_length=20, blank=True)
     address = models.OneToOneField(
         Address,
-        on_delete=models.PROTECT,
+        on_delete=models.CASCADE,
         related_name="firm",
     )
     services = models.ManyToManyField(

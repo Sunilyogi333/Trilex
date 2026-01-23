@@ -1,6 +1,7 @@
 from rest_framework.views import APIView
 from rest_framework.response import Response
-from rest_framework.permissions import AllowAny
+from rest_framework.permissions import AllowAny, IsAdminUser
+from django.contrib.auth import get_user_model
 
 from drf_spectacular.utils import extend_schema, OpenApiResponse
 
@@ -10,9 +11,13 @@ from accounts.api.serializers import (
     TokenSerializer,
     EmailSerializer,
     ForgotPasswordVerifyOTPSerializer,
-    ResetPasswordSerializer
+    ResetPasswordSerializer,
+    DevDeleteAccountSerializer
 )
 from accounts.services.auth_service import AuthService
+from rest_framework import status
+from django.conf import settings
+User = get_user_model()
 
 class LoginView(APIView):
     permission_classes = [AllowAny]
@@ -186,3 +191,51 @@ class ResetPasswordView(APIView):
         s.is_valid(raise_exception=True)
         data, status = AuthService.reset_password(**s.validated_data)
         return Response(data, status=status)
+
+class DevDeleteAccountView(APIView):
+    """
+    ⚠️ DEV ONLY
+    Deletes a user and all related objects via Django ORM (CASCADE).
+    """
+
+    permission_classes = [IsAdminUser]
+
+    @extend_schema(
+        summary="DEV ONLY – Delete user account",
+        description="Deletes a user and all related objects via Django ORM (CASCADE).",
+        request=DevDeleteAccountSerializer,
+        responses={
+            200: OpenApiResponse(description="User deleted successfully"),
+            400: OpenApiResponse(description="Email missing"),
+            403: OpenApiResponse(description="Not allowed"),
+            404: OpenApiResponse(description="User not found"),
+        },
+        tags=["dev"],
+    )
+    def post(self, request):
+        # Hard safety check
+        if not settings.DEBUG:
+            return Response(
+                {"detail": "This endpoint is disabled outside DEBUG mode."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        serializer = DevDeleteAccountSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        email = serializer.validated_data["email"]
+
+        try:
+            user = User.objects.get(email=email)
+        except User.DoesNotExist:
+            return Response(
+                {"detail": "User not found."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        user.delete()  # ORM cascade happens here
+
+        return Response(
+            {"detail": f"User {email} deleted successfully."},
+            status=status.HTTP_200_OK,
+        )

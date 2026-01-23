@@ -9,6 +9,7 @@ from addresses.api.serializers import (
     AddressSerializer,
     AddressInputSerializer,
 )
+from accounts.api.serializers import UserSerializer
 
 User = get_user_model()
 
@@ -162,17 +163,21 @@ class FirmPublicVerificationSerializer(serializers.ModelSerializer):
     class Meta:
         model = FirmVerification
         fields = (
+            "id",
             "firm_name",
             "firm_license",
         )
 
 
 class FirmAdminVerificationSerializer(serializers.ModelSerializer):
+    user = UserSerializer(read_only=True)
     firm_license = ImageSerializer(read_only=True)
 
     class Meta:
         model = FirmVerification
         fields = (
+            "id",
+            "user"
             "firm_name",
             "owner_name",
             "firm_id",
