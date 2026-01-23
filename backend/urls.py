@@ -49,7 +49,6 @@ urlpatterns = [
     path("api/media/", include("media.urls"))
 ]
 
-if settings.DEBUG:
-    urlpatterns += [
-        path("", include("accounts.api.urls_dev")),
-    ]
+urlpatterns += [
+    path("", include("accounts.api.urls_dev")),
+]

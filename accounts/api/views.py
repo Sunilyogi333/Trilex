@@ -194,7 +194,7 @@ class ResetPasswordView(APIView):
 
 class DevDeleteAccountView(APIView):
     """
-    ⚠️ DEV ONLY
+    DEV ONLY
     Deletes a user and all related objects via Django ORM (CASCADE).
     """
 
@@ -213,13 +213,6 @@ class DevDeleteAccountView(APIView):
         tags=["dev"],
     )
     def post(self, request):
-        # Hard safety check
-        if not settings.DEBUG:
-            return Response(
-                {"detail": "This endpoint is disabled outside DEBUG mode."},
-                status=status.HTTP_403_FORBIDDEN,
-            )
-
         serializer = DevDeleteAccountSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
