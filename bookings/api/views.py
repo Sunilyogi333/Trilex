@@ -10,13 +10,19 @@ from bookings.api.serializers import (
     BookingDetailSerializer,
 )
 from bookings.services.services import BookingService
-from base.constants.user_roles import UserRoles
-from accounts.permissions import IsAuthenticatedUser, IsEmailVerified, IsClientUser, IsClientVerified, IsVerifiedLawyerOrFirm
+from accounts.permissions import (
+    IsAuthenticatedUser,
+    IsEmailVerified,
+    IsClientUser,
+    IsClientVerified,
+    IsVerifiedLawyerOrFirm,
+)
 from drf_spectacular.utils import extend_schema, OpenApiResponse
-from drf_spectacular.utils import extend_schema_field
 
 
-
+# -------------------------
+# CREATE BOOKING (CLIENT)
+# -------------------------
 class BookingCreateAPIView(APIView):
     permission_classes = [
         IsAuthenticatedUser,
@@ -27,7 +33,7 @@ class BookingCreateAPIView(APIView):
 
     @extend_schema(
         summary="Create booking",
-        description="Client creates a booking request to a lawyer or firm.",
+        description="Verified client creates a booking request to a lawyer or firm.",
         request=BookingCreateSerializer,
         responses={
             201: BookingDetailSerializer,
@@ -39,22 +45,26 @@ class BookingCreateAPIView(APIView):
     def post(self, request):
         serializer = BookingCreateSerializer(
             data=request.data,
-            context={"request": request}
+            context={"request": request},
         )
         serializer.is_valid(raise_exception=True)
 
         booking = BookingService.create_booking(
             created_by=request.user,
-            **serializer.validated_data
+            **serializer.validated_data,
         )
 
         return Response(
             BookingDetailSerializer(booking).data,
-            status=status.HTTP_201_CREATED
+            status=status.HTTP_201_CREATED,
         )
 
+
+# -------------------------
+# MY SENT BOOKINGS (CLIENT)
+# -------------------------
 class MySentBookingsAPIView(APIView):
-    permission_classes = [  
+    permission_classes = [
         IsAuthenticatedUser,
         IsEmailVerified,
         IsClientUser,
@@ -68,13 +78,14 @@ class MySentBookingsAPIView(APIView):
         tags=["bookings"],
     )
     def get(self, request):
-        bookings = Booking.objects.filter(
-            created_by=request.user
-        )
-
+        bookings = Booking.objects.filter(created_by=request.user)
         serializer = BookingListSerializer(bookings, many=True)
         return Response(serializer.data)
 
+
+# -------------------------
+# MY RECEIVED BOOKINGS (LAWYER / FIRM)
+# -------------------------
 class MyReceivedBookingsAPIView(APIView):
     permission_classes = [
         IsAuthenticatedUser,
@@ -89,13 +100,14 @@ class MyReceivedBookingsAPIView(APIView):
         tags=["bookings"],
     )
     def get(self, request):
-        bookings = Booking.objects.filter(
-            created_to=request.user
-        )
-
+        bookings = Booking.objects.filter(created_to=request.user)
         serializer = BookingListSerializer(bookings, many=True)
         return Response(serializer.data)
 
+
+# -------------------------
+# BOOKING DETAIL (BOTH SIDES)
+# -------------------------
 class BookingDetailAPIView(APIView):
     permission_classes = [IsAuthenticatedUser]
 
@@ -108,24 +120,30 @@ class BookingDetailAPIView(APIView):
     def get(self, request, pk):
         booking = get_object_or_404(Booking, pk=pk)
 
-        if request.user not in [booking.created_by, booking.created_to]:
+        if request.user not in (booking.created_by, booking.created_to):
             return Response(
                 {"detail": "You do not have access to this booking."},
-                status=status.HTTP_403_FORBIDDEN
+                status=status.HTTP_403_FORBIDDEN,
             )
 
         serializer = BookingDetailSerializer(booking)
         return Response(serializer.data)
 
+
+# -------------------------
+# ACCEPT BOOKING
+# -------------------------
 class BookingAcceptAPIView(APIView):
     permission_classes = [
         IsAuthenticatedUser,
         IsEmailVerified,
         IsVerifiedLawyerOrFirm,
     ]
+
     @extend_schema(
         summary="Accept booking",
         description="Lawyer or firm accepts a booking request.",
+        request=None,
         responses={200: BookingDetailSerializer},
         tags=["bookings"],
     )
@@ -134,22 +152,26 @@ class BookingAcceptAPIView(APIView):
 
         booking = BookingService.accept_booking(
             booking=booking,
-            user=request.user
+            user=request.user,
         )
 
-        return Response(
-            BookingDetailSerializer(booking).data
-        )
+        return Response(BookingDetailSerializer(booking).data)
 
+
+# -------------------------
+# REJECT BOOKING
+# -------------------------
 class BookingRejectAPIView(APIView):
     permission_classes = [
         IsAuthenticatedUser,
         IsEmailVerified,
         IsVerifiedLawyerOrFirm,
     ]
+
     @extend_schema(
         summary="Reject booking",
         description="Lawyer or firm rejects a booking request.",
+        request=None,
         responses={200: BookingDetailSerializer},
         tags=["bookings"],
     )
@@ -158,9 +180,7 @@ class BookingRejectAPIView(APIView):
 
         booking = BookingService.reject_booking(
             booking=booking,
-            user=request.user
+            user=request.user,
         )
 
-        return Response(
-            BookingDetailSerializer(booking).data
-        )
+        return Response(BookingDetailSerializer(booking).data)

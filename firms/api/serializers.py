@@ -20,7 +20,7 @@ User = get_user_model()
 class FirmUserSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
-        fields = ("email", "role")
+        fields = ("id", "email", "role")
 
 
 # -------------------------

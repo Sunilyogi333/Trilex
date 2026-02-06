@@ -97,6 +97,10 @@ SPECTACULAR_SETTINGS = {
             "description": "Local development server",
         }
     ],
+    "ENUM_NAME_OVERRIDES": {
+        "base.constants.booking_status.BookingStatus": "BookingStatusEnum",
+        "base.constants.verification.VerificationStatus": "VerificationStatusEnum",
+    },
 }
 
 MIDDLEWARE = [

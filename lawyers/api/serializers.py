@@ -21,7 +21,7 @@ User = get_user_model()
 class LawyerUserSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
-        fields = ("email", "role")
+        fields = ("id", "email", "role")
 
 
 # -------------------------

@@ -8,6 +8,7 @@ from base.constants.booking_status import BookingStatus
 from base.constants.verification import VerificationStatus
 from bookings.models import Booking
 from django.contrib.auth import get_user_model
+from drf_spectacular.utils import extend_schema_field
 
 User = get_user_model()
 
@@ -128,11 +129,14 @@ class BookingListSerializer(serializers.ModelSerializer):
             "created_at",
         ]
 
-    def get_created_by(self, obj):
+    @extend_schema_field(BookingActorSerializer)
+    def get_created_by(seclf, obj):
         return BookingActorSerializer.get_actor_data(obj.created_by)
 
+    @extend_schema_field(BookingActorSerializer)
     def get_created_to(self, obj):
         return BookingActorSerializer.get_actor_data(obj.created_to)
+
 
 
 class BookingDetailSerializer(serializers.ModelSerializer):
@@ -162,9 +166,11 @@ class BookingDetailSerializer(serializers.ModelSerializer):
             "created_at",
         ]
 
+    @extend_schema_field(BookingActorSerializer)
     def get_created_by(self, obj):
         return BookingActorSerializer.get_actor_data(obj.created_by)
 
+    @extend_schema_field(BookingActorSerializer)
     def get_created_to(self, obj):
         return BookingActorSerializer.get_actor_data(obj.created_to)
 
