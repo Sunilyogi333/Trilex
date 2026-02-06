@@ -46,7 +46,8 @@ urlpatterns = [
     path("api/firms/", include("firms.urls")),
     path("api/cases/", include("cases.urls")),
     path("api/addresses/", include("addresses.urls")),
-    path("api/media/", include("media.urls"))
+    path("api/media/", include("media.urls")),
+    path("api/bookings/", include("bookings.urls")),
 ]
 
 urlpatterns += [

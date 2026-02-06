@@ -2,6 +2,7 @@
 
 from rest_framework.permissions import BasePermission
 from base.constants.user_roles import UserRoles
+from base.constants.verification import VerificationStatus
 
 
 # -------------------------------------------------
@@ -79,7 +80,7 @@ class IsClientVerified(BasePermission):
         )
         return (
             verification
-            and verification.status == verification.Status.VERIFIED
+            and verification.status == VerificationStatus.VERIFIED
         )
 
 
@@ -98,7 +99,7 @@ class IsLawyerVerified(BasePermission):
         )
         return (
             verification
-            and verification.status == verification.Status.VERIFIED
+            and verification.status == VerificationStatus.VERIFIED
         )
 
 
@@ -117,5 +118,27 @@ class IsFirmVerified(BasePermission):
         )
         return (
             verification
-            and verification.status == verification.Status.VERIFIED
+            and verification.status == VerificationStatus.VERIFIED
+        )
+
+class IsVerifiedLawyerOrFirm(BasePermission):
+    """
+    Allows access only to VERIFIED lawyers or VERIFIED firms.
+    """
+    def has_permission(self, request, view):
+        user = request.user
+
+        if not user or not user.is_authenticated:
+            return False
+
+        if user.role == UserRoles.LAWYER:
+            verification = getattr(user, "bar_verification", None)
+        elif user.role == UserRoles.FIRM:
+            verification = getattr(user, "firm_verification", None)
+        else:
+            return False
+
+        return (
+            verification
+            and verification.status == VerificationStatus.VERIFIED
         )

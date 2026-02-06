@@ -49,13 +49,6 @@ class ClientVerificationStatusSerializer(serializers.ModelSerializer):
             "rejection_reason",
         )
 
-
-# -------------------------
-# ME AGGREGATE
-# -------------------------
-
-
-
 # -------------------------
 # SIGNUP
 # -------------------------
