@@ -10,7 +10,9 @@ from drf_spectacular.utils import extend_schema, OpenApiParameter, OpenApiRespon
 from accounts.permissions import IsLawyerVerified
 from firms.models import FirmInvitation
 from firms.services.firm_invitation_service import FirmInvitationService
-from firms.api.serializers import FirmInvitationListSerializer
+from firms.api.serializers import (
+    LawyerReceivedInvitationListSerializer,
+)
 
 
 class LawyerInvitationsListView(APIView):
@@ -18,7 +20,7 @@ class LawyerInvitationsListView(APIView):
 
     @extend_schema(
         summary="List received firm invitations",
-        responses={200: FirmInvitationListSerializer(many=True)},
+        responses={200: LawyerReceivedInvitationListSerializer(many=True)},
         tags=["lawyer-invitations"],
     )
     def get(self, request):
@@ -29,7 +31,7 @@ class LawyerInvitationsListView(APIView):
             "firm__user",
         )
 
-        serializer = FirmInvitationListSerializer(
+        serializer = LawyerReceivedInvitationListSerializer(
             invitations,
             many=True
         )

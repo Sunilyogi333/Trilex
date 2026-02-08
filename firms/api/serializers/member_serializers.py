@@ -1,11 +1,11 @@
 from rest_framework import serializers
 
 from firms.models import FirmMember
-from lawyers.api.serializers import LawyerPublicSerializer
+from .invitation_serializers import LawyerPublicForInvitationSerializer
 
 
 class FirmMemberSerializer(serializers.ModelSerializer):
-    lawyer = LawyerPublicSerializer(
+    lawyer = LawyerPublicForInvitationSerializer(
         read_only=True
     )
 

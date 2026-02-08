@@ -1,6 +1,9 @@
 from .invitation_serializers import (
     FirmInvitationSerializer,
-    FirmInvitationListSerializer,
+    FirmPublicForInvitationSerializer,
+    FirmSentInvitationListSerializer,
+    LawyerPublicForInvitationSerializer,
+    LawyerReceivedInvitationListSerializer,
 )
 from .member_serializers import FirmMemberSerializer
 from .verification_serializers import (
@@ -40,4 +43,9 @@ __all__ = [
     "FirmSignupSerializer",
     "FirmMeSerializer",
     "FirmAdminSerializer",
+    "FirmReceivedInvitationListSerializer",
+    "FirmSentInvitationListSerializer",
+    "FirmPublicForInvitationSerializer",
+    "LawyerPublicForInvitationSerializer",
+    "LawyerReceivedInvitationListSerializer",
 ]

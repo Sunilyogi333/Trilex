@@ -11,7 +11,7 @@ from accounts.permissions import IsFirmVerified
 from firms.services.firm_invitation_service import FirmInvitationService
 from firms.api.serializers import (
     FirmInvitationSerializer,
-    FirmInvitationListSerializer,
+    FirmSentInvitationListSerializer,
 )
 from lawyers.models import Lawyer
 
@@ -49,7 +49,7 @@ class FirmSentInvitationsView(APIView):
 
     @extend_schema(
         summary="List firm sent invitations",
-        responses={200: FirmInvitationListSerializer(many=True)},
+        responses={200: FirmSentInvitationListSerializer(many=True)},
         tags=["firm-invitations"],
     )
     def get(self, request):
@@ -61,7 +61,7 @@ class FirmSentInvitationsView(APIView):
             "firm",
         )
 
-        serializer = FirmInvitationListSerializer(
+        serializer = FirmSentInvitationListSerializer(
             invitations,
             many=True
         )

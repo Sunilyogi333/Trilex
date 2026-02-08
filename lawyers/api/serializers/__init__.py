@@ -14,6 +14,7 @@ from .lawyer_serializers import (
     LawyerMeSerializer,
     LawyerPublicSerializer,
     LawyerAdminSerializer,
+    LawyerUserSerializer,
 )
 
 __all__ = [
@@ -29,4 +30,5 @@ __all__ = [
     "LawyerMeSerializer",
     "LawyerPublicSerializer",
     "LawyerAdminSerializer",
+    "LawyerUserSerializer",
 ]
