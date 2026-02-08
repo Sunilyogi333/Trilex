@@ -8,7 +8,10 @@ from firms.api.views import (
     FirmMeView,
     FirmProfileUpdateView,
     FirmListView,
-    FirmDetailView
+    FirmDetailView,
+    FirmInviteLawyerView,
+    FirmSentInvitationsView,
+    FirmMembersListView
 )
 
 urlpatterns = [
@@ -33,4 +36,21 @@ urlpatterns = [
         "verifications/<uuid:verification_id>/<str:action>/",
         FirmVerificationActionView.as_view(),
     ),
+
+    # invitations
+    path(
+        "me/invite-lawyer/<uuid:lawyer_id>/",
+        FirmInviteLawyerView.as_view(),
+    ),
+    path(
+        "me/invitations/",
+        FirmSentInvitationsView.as_view(),
+    ),
+
+    # members
+    path(
+        "me/members/",
+        FirmMembersListView.as_view(),
+    ),
+
 ]

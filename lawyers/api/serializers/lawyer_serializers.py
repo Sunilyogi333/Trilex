@@ -2,40 +2,32 @@ from rest_framework import serializers
 from django.contrib.auth.password_validation import validate_password
 from django.contrib.auth import get_user_model
 
-from lawyers.models import Lawyer, BarVerification
+from lawyers.models import Lawyer
 from cases.models import CaseCategory
-from media.models import Image
-from media.api.serializers import ImageSerializer
 from addresses.api.serializers import (
     AddressInputSerializer,
     AddressSerializer,
 )
-from accounts.api.serializers import UserSerializer
+from .verification_serializers import (
+    BarVerificationInputSerializer,
+    BarVerificationMeSerializer,
+    LawyerPublicVerificationSerializer,
+    LawyerAdminVerificationSerializer,
+)
 
 User = get_user_model()
 
 
-# -------------------------
-# USER
-# -------------------------
 class LawyerUserSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
         fields = ("id", "email", "role")
 
-
-# -------------------------
-# SERVICES
-# -------------------------
 class LawyerServiceSerializer(serializers.ModelSerializer):
     class Meta:
         model = CaseCategory
         fields = ("id", "name")
 
-
-# -------------------------
-# PROFILE
-# -------------------------
 class LawyerProfileSerializer(serializers.ModelSerializer):
     services = LawyerServiceSerializer(many=True)
     address = AddressSerializer(read_only=True)
@@ -47,7 +39,6 @@ class LawyerProfileSerializer(serializers.ModelSerializer):
             "address",
             "services",
         )
-
 
 class LawyerProfileUpdateSerializer(serializers.Serializer):
     phone_number = serializers.CharField(required=False)
@@ -66,37 +57,6 @@ class LawyerProfileUpdateSerializer(serializers.Serializer):
                 "At least one service is required."
             )
         return value
-
-
-# -------------------------
-# VERIFICATION (ME)
-# -------------------------
-class LawyerVerificationStatusSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = BarVerification
-        fields = (
-            "status",
-            "rejection_reason",
-        )
-
-# -------------------------
-# SIGNUP
-# -------------------------
-class BarVerificationInputSerializer(serializers.ModelSerializer):
-    license_photo = serializers.PrimaryKeyRelatedField(
-        queryset=Image.objects.all()
-    )
-
-    class Meta:
-        model = BarVerification
-        fields = (
-            "full_name",
-            "date_of_birth",
-            "bar_id",
-            "gender",
-            "license_photo",
-        )
-
 
 class LawyerSignupSerializer(serializers.Serializer):
     email = serializers.EmailField()
@@ -122,76 +82,6 @@ class LawyerSignupSerializer(serializers.Serializer):
                 "At least one service is required."
             )
         return value
-
-
-
-# -------------------------
-# VERIFICATION APIs
-# -------------------------
-class BarVerificationSerializer(serializers.ModelSerializer):
-    license_photo = serializers.PrimaryKeyRelatedField(
-        queryset=Image.objects.all()
-    )
-
-    class Meta:
-        model = BarVerification
-        fields = (
-            "full_name",
-            "date_of_birth",
-            "bar_id",
-            "gender",
-            "license_photo",
-        )
-
-
-class BarVerificationMeSerializer(serializers.ModelSerializer):
-    license_photo = ImageSerializer(read_only=True)
-
-    class Meta:
-        model = BarVerification
-        fields = (
-            "full_name",
-            "date_of_birth",
-            "bar_id",
-            "gender",
-            "status",
-            "rejection_reason",
-            "license_photo",
-        )
-class LawyerRejectReasonSerializer(serializers.Serializer):
-    rejection_reason = serializers.CharField(required=True)
-
-# -------------------------
-# PUBLIC / ADMIN LIST & DETAIL
-# -------------------------
-class LawyerPublicVerificationSerializer(serializers.ModelSerializer):
-    license_photo = ImageSerializer(read_only=True)
-
-    class Meta:
-        model = BarVerification
-        fields = (
-            "full_name",
-            "license_photo",
-        )
-
-class LawyerAdminVerificationSerializer(serializers.ModelSerializer):
-    user = UserSerializer(read_only=True)
-    license_photo = ImageSerializer(read_only=True)
-
-    class Meta:
-        model = BarVerification
-        fields = (
-            "id",
-            "user",
-            "full_name",
-            "date_of_birth",
-            "bar_id",
-            "gender",
-            "status",
-            "rejection_reason",
-            "license_photo",
-        )
-
 
 class LawyerPublicSerializer(serializers.Serializer):
     id = serializers.UUIDField(source="profile.id", read_only=True)
