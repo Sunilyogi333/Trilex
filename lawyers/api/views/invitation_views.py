@@ -5,14 +5,18 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 
-from drf_spectacular.utils import extend_schema, OpenApiParameter, OpenApiResponse
+from drf_spectacular.utils import (
+    extend_schema,
+    OpenApiParameter,
+    OpenApiResponse,
+)
+from base.pagination import DefaultPageNumberPagination
+from base.openapi import PAGE_PARAMETER, PAGE_SIZE_PARAMETER
 
 from accounts.permissions import IsLawyerVerified
 from firms.models import FirmInvitation
 from firms.services.firm_invitation_service import FirmInvitationService
-from firms.api.serializers import (
-    LawyerReceivedInvitationListSerializer,
-)
+from firms.api.serializers import LawyerReceivedInvitationListSerializer
 
 
 class LawyerInvitationsListView(APIView):
@@ -20,23 +24,29 @@ class LawyerInvitationsListView(APIView):
 
     @extend_schema(
         summary="List received firm invitations",
+        parameters=[
+            PAGE_PARAMETER,
+            PAGE_SIZE_PARAMETER,
+        ],
         responses={200: LawyerReceivedInvitationListSerializer(many=True)},
         tags=["lawyer-invitations"],
     )
     def get(self, request):
         lawyer = request.user.lawyer_profile
 
-        invitations = lawyer.received_invitations.select_related(
+        qs = lawyer.received_invitations.select_related(
             "firm",
             "firm__user",
         )
 
+        paginator = DefaultPageNumberPagination()
+        page = paginator.paginate_queryset(qs, request)
+
         serializer = LawyerReceivedInvitationListSerializer(
-            invitations,
+            page,
             many=True
         )
-        return Response(serializer.data)
-
+        return paginator.get_paginated_response(serializer.data)
 
 class LawyerInvitationRespondView(APIView):
     permission_classes = [IsAuthenticated, IsLawyerVerified]

@@ -6,6 +6,8 @@ from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 
 from drf_spectacular.utils import extend_schema, OpenApiResponse
+from base.pagination import DefaultPageNumberPagination
+from base.openapi import PAGE_PARAMETER, PAGE_SIZE_PARAMETER
 
 from accounts.permissions import IsFirmVerified
 from firms.services.firm_invitation_service import FirmInvitationService
@@ -44,25 +46,29 @@ class FirmInviteLawyerView(APIView):
         return Response(serializer.data, status=201)
 
 
+
 class FirmSentInvitationsView(APIView):
     permission_classes = [IsAuthenticated, IsFirmVerified]
 
     @extend_schema(
         summary="List firm sent invitations",
+        parameters=[
+            PAGE_PARAMETER,
+            PAGE_SIZE_PARAMETER,
+        ],
         responses={200: FirmSentInvitationListSerializer(many=True)},
         tags=["firm-invitations"],
     )
     def get(self, request):
         firm = request.user.firm_profile
 
-        invitations = firm.sent_invitations.select_related(
+        qs = firm.sent_invitations.select_related(
             "lawyer",
             "lawyer__user",
-            "firm",
         )
 
-        serializer = FirmSentInvitationListSerializer(
-            invitations,
-            many=True
-        )
-        return Response(serializer.data)
+        paginator = DefaultPageNumberPagination()
+        page = paginator.paginate_queryset(qs, request)
+
+        serializer = FirmSentInvitationListSerializer(page, many=True)
+        return paginator.get_paginated_response(serializer.data)
