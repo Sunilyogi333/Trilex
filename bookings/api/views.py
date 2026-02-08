@@ -17,8 +17,10 @@ from accounts.permissions import (
     IsClientVerified,
     IsVerifiedLawyerOrFirm,
 )
-from drf_spectacular.utils import extend_schema, OpenApiResponse
-
+from drf_spectacular.utils import extend_schema, OpenApiResponse, OpenApiParameter
+from base.constants.booking_status import BookingStatus
+from base.pagination import DefaultPageNumberPagination
+from rest_framework.exceptions import APIException
 
 # -------------------------
 # CREATE BOOKING (CLIENT)
@@ -73,15 +75,36 @@ class MySentBookingsAPIView(APIView):
 
     @extend_schema(
         summary="My sent bookings",
-        description="List bookings created by the authenticated client.",
+        description="List bookings created by the authenticated client. Can be filtered by status.",
+        parameters=[
+            OpenApiParameter(
+                name="status",
+                type=str,
+                location=OpenApiParameter.QUERY,
+                enum=[s for s, _ in BookingStatus.choices],
+                description="Filter bookings by status",
+            ),
+            OpenApiParameter("page", int, OpenApiParameter.QUERY),
+            OpenApiParameter("page_size", int, OpenApiParameter.QUERY),
+        ],
         responses={200: BookingListSerializer(many=True)},
         tags=["bookings"],
     )
     def get(self, request):
-        bookings = Booking.objects.filter(created_by=request.user)
-        serializer = BookingListSerializer(bookings, many=True)
-        return Response(serializer.data)
+        qs = Booking.objects.filter(created_by=request.user)
 
+        status_param = request.query_params.get("status")
+        if status_param:
+            valid_statuses = {s for s, _ in BookingStatus.choices}
+            if status_param not in valid_statuses:
+                raise APIException("Invalid booking status.")
+            qs = qs.filter(status=status_param)
+
+        paginator = DefaultPageNumberPagination()
+        page = paginator.paginate_queryset(qs, request)
+
+        serializer = BookingListSerializer(page, many=True)
+        return paginator.get_paginated_response(serializer.data)
 
 # -------------------------
 # MY RECEIVED BOOKINGS (LAWYER / FIRM)
@@ -95,14 +118,36 @@ class MyReceivedBookingsAPIView(APIView):
 
     @extend_schema(
         summary="My received bookings",
-        description="List booking requests received by verified lawyer or firm.",
+        description="List booking requests received by verified lawyer or firm. Can be filtered by status.",
+        parameters=[
+            OpenApiParameter(
+                name="status",
+                type=str,
+                location=OpenApiParameter.QUERY,
+                enum=[s for s, _ in BookingStatus.choices],
+                description="Filter bookings by status",
+            ),
+            OpenApiParameter("page", int, OpenApiParameter.QUERY),
+            OpenApiParameter("page_size", int, OpenApiParameter.QUERY),
+        ],
         responses={200: BookingListSerializer(many=True)},
         tags=["bookings"],
     )
     def get(self, request):
-        bookings = Booking.objects.filter(created_to=request.user)
-        serializer = BookingListSerializer(bookings, many=True)
-        return Response(serializer.data)
+        qs = Booking.objects.filter(created_to=request.user)
+
+        status_param = request.query_params.get("status")
+        if status_param:
+            valid_statuses = {s for s, _ in BookingStatus.choices}
+            if status_param not in valid_statuses:
+                raise APIException("Invalid booking status.")
+            qs = qs.filter(status=status_param)
+
+        paginator = DefaultPageNumberPagination()
+        page = paginator.paginate_queryset(qs, request)
+
+        serializer = BookingListSerializer(page, many=True)
+        return paginator.get_paginated_response(serializer.data)
 
 
 # -------------------------
