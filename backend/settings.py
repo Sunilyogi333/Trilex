@@ -36,6 +36,11 @@ SECRET_KEY = os.environ["SECRET_KEY"]
 BREVO_API_KEY = os.environ.get("BREVO_API_KEY")
 JWT_SECRET = os.environ.get("JWT_SECRET")
 FRONTEND_URL = os.environ.get("FRONTEND_URL")
+AI_SERVICE_URL = os.getenv(
+    "AI_SERVICE_BASE_URL",
+    "http://localhost:8001"
+)
+
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.environ.get("DEBUG") == "True"
@@ -65,6 +70,7 @@ INSTALLED_APPS = [
     "cases",
     "addresses",
     "bookings",
+    "ai_assistant",
 ]
 
 AUTH_USER_MODEL = "accounts.User"

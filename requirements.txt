@@ -1,6 +1,7 @@
 asgiref==3.11.0
 attrs==25.4.0
 certifi==2026.1.4
+charset-normalizer==3.4.4
 cloudinary==1.44.1
 dj-database-url==3.0.1
 Django==5.2.9
@@ -9,6 +10,7 @@ djangorestframework==3.16.1
 djangorestframework_simplejwt==5.5.1
 drf-spectacular==0.29.0
 gunicorn==23.0.0
+idna==3.11
 inflection==0.5.1
 jsonschema==4.25.1
 jsonschema-specifications==2025.9.1
@@ -22,6 +24,7 @@ python-dateutil==2.9.0.post0
 python-dotenv==1.2.1
 PyYAML==6.0.3
 referencing==0.37.0
+requests==2.32.5
 rpds-py==0.30.0
 sib-api-v3-sdk==7.6.0
 six==1.17.0

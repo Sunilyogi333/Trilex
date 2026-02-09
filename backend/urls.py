@@ -48,6 +48,7 @@ urlpatterns = [
     path("api/addresses/", include("addresses.urls")),
     path("api/media/", include("media.urls")),
     path("api/bookings/", include("bookings.urls")),
+    path("api/ai-assistant/", include("ai_assistant.urls")),
 ]
 
 urlpatterns += [
