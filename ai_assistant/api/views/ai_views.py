@@ -2,7 +2,7 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 
-from drf_spectacular.utils import extend_schema, OpenApiResponse
+from drf_spectacular.utils import extend_schema, OpenApiResponse, OpenApiParameter
 
 from base.constants.user_roles import UserRoles
 from base.constants.verification import VerificationStatus
@@ -161,6 +161,12 @@ class AIQueryView(APIView):
         return Response(response_payload, status=200)
 
 class AIQueryHistoryListView(APIView):
+    """
+    Chat-style AI history listing.
+    AI message appears first, followed by user query.
+    Paginated by conversation turns.
+    """
+
     permission_classes = [
         IsAuthenticated,
         IsVerifiedClientLawyerOrFirm,
@@ -168,8 +174,29 @@ class AIQueryHistoryListView(APIView):
 
     @extend_schema(
         summary="Get my AI chat history",
-        description="Returns AI query history in chat-style flattened message format.",
-        responses={200: OpenApiResponse(description="Chat history")},
+        description=(
+            "Returns paginated AI chat history. "
+            "Each conversation turn is returned as two messages: "
+            "AI response first, then user query. "
+            "Ordered newest to oldest."
+        ),
+        parameters=[
+            OpenApiParameter(
+                name="page",
+                type=int,
+                location=OpenApiParameter.QUERY,
+                description="Page number"
+            ),
+            OpenApiParameter(
+                name="page_size",
+                type=int,
+                location=OpenApiParameter.QUERY,
+                description="Number of conversation turns per page"
+            ),
+        ],
+        responses={
+            200: OpenApiResponse(description="Chat history"),
+        },
         tags=["ai-assistant"],
     )
     def get(self, request):
@@ -181,7 +208,7 @@ class AIQueryHistoryListView(APIView):
                 "recommended_lawyers__user__bar_verification",
                 "recommended_firms__user__firm_verification",
             )
-            .order_by("created_at")
+            .order_by("-created_at")  # 🔥 newest first
         )
 
         paginator = DefaultPageNumberPagination()
@@ -190,14 +217,7 @@ class AIQueryHistoryListView(APIView):
         messages = []
 
         for history in page:
-            # 🧑 USER MESSAGE
-            messages.append({
-                "sender": "user",
-                "message": history.query,
-                "created_at": history.created_at,
-            })
-
-            # 🤖 AI MESSAGE
+            # 🤖 AI MESSAGE FIRST
             ai_message = {
                 "sender": "ai",
                 "message": history.answer or "",
@@ -206,7 +226,6 @@ class AIQueryHistoryListView(APIView):
                 "created_at": history.created_at,
             }
 
-            # Only CLIENT recommendation messages have recommendations
             if (
                 history.query_type == QueryType.RECOMMENDATION
                 and history.case_category
@@ -216,27 +235,34 @@ class AIQueryHistoryListView(APIView):
                     "lawyers": LawyerPublicSerializer(
                         [
                             {
-                                "user": l.user,
-                                "profile": l,
-                                "verification": l.user.bar_verification,
+                                "user": lawyer.user,
+                                "profile": lawyer,
+                                "verification": lawyer.user.bar_verification,
                             }
-                            for l in history.recommended_lawyers.all()
+                            for lawyer in history.recommended_lawyers.all()
                         ],
                         many=True,
                     ).data,
                     "firms": FirmPublicSerializer(
                         [
                             {
-                                "user": f.user,
-                                "profile": f,
-                                "verification": f.user.firm_verification,
+                                "user": firm.user,
+                                "profile": firm,
+                                "verification": firm.user.firm_verification,
                             }
-                            for f in history.recommended_firms.all()
+                            for firm in history.recommended_firms.all()
                         ],
                         many=True,
                     ).data,
                 }
 
             messages.append(ai_message)
+
+            # 🧑 USER MESSAGE AFTER
+            messages.append({
+                "sender": "user",
+                "message": history.query,
+                "created_at": history.created_at,
+            })
 
         return paginator.get_paginated_response(messages)
