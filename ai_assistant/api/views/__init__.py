@@ -1,3 +1,9 @@
-from .ai_views import AIQueryView
+from .ai_views import (
+    AIQueryView,
+    AIQueryHistoryListView
+    )
 
-__all__ = ["AIQueryView"]
+__all__ = [
+    "AIQueryView", 
+    "AIQueryHistoryListView"
+    ]

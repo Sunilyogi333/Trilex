@@ -142,3 +142,27 @@ class IsVerifiedLawyerOrFirm(BasePermission):
             verification
             and verification.status == VerificationStatus.VERIFIED
         )
+
+class IsVerifiedClientLawyerOrFirm(BasePermission):
+    """
+    Allows access only to VERIFIED clients, lawyers, or firms.
+    """
+    def has_permission(self, request, view):
+        user = request.user
+
+        if not user or not user.is_authenticated:
+            return False
+
+        if user.role == UserRoles.CLIENT:
+            verification = getattr(user, "client_verification", None)
+        elif user.role == UserRoles.LAWYER:
+            verification = getattr(user, "bar_verification", None)
+        elif user.role == UserRoles.FIRM:
+            verification = getattr(user, "firm_verification", None)
+        else:
+            return False
+
+        return (
+            verification
+            and verification.status == VerificationStatus.VERIFIED
+        )
