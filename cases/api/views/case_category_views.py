@@ -5,7 +5,7 @@ from rest_framework.permissions import AllowAny
 from django.shortcuts import get_object_or_404
 
 from cases.models import CaseCategory
-from .serializers import CaseCategorySerializer
+from cases.api.serializers.case_category_serializers import CaseCategorySerializer
 from cases.services.services import CaseCategoryService
 from accounts.permissions import IsAdminUser
 from drf_spectacular.utils import (

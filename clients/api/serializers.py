@@ -12,7 +12,7 @@ from accounts.api.serializers import UserSerializer
 User = get_user_model()
 
 # -------------------------
-# USER
+# USERs
 # -------------------------
 class ClientUserSerializer(serializers.ModelSerializer):
     class Meta:
