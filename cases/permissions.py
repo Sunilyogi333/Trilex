@@ -59,8 +59,10 @@ class CanEditCase(BasePermission):
 
         return any([
             is_case_owner_lawyer(user, obj),
+            is_case_owner_firm_admin(user, obj),
             is_assigned_lawyer(user, obj, require_edit=True),
         ])
+
 
 class CanAssignCaseLawyers(BasePermission):
     def has_object_permission(self, request, view, obj: Case):
