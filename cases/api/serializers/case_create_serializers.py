@@ -5,8 +5,10 @@ from cases.models.case import CaseOwnerType, CourtType, CaseStatus
 
 from cases.api.serializers.case_client_serializers import CaseClientCreateSerializer
 from cases.api.serializers.case_waris_serializers import CaseWarisCreateSerializer
-from cases.api.serializers import (
+from cases.api.serializers.case_document_serializers import (
     CaseDocumentCreateSerializer,
+)
+from cases.api.serializers.case_date_serailizers import (
     CaseDateCreateSerializer,
 )
 
