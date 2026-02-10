@@ -1,6 +1,6 @@
 from django.db import transaction
 from django.shortcuts import get_object_or_404
-from django.db.models import Q
+from django.db.models import Q, Count
 
 from rest_framework.views import APIView
 from rest_framework.response import Response
@@ -137,6 +137,8 @@ class CaseCreateView(APIView):
             status=201
         )
 
+from django.db.models import Count
+
 class CaseDetailView(APIView):
     permission_classes = [IsAuthenticated, CanViewCase]
 
@@ -152,11 +154,11 @@ class CaseDetailView(APIView):
             "**What is returned:**\n"
             "- Case metadata\n"
             "- Client and waris snapshots\n"
-            "- All case documents\n"
             "- All case dates\n"
+            "- Total document count\n"
             "- Assigned lawyers and their roles\n\n"
             "**Important notes:**\n"
-            "- Clients can only see their own uploaded documents\n"
+            "- Documents are NOT embedded; use documents API\n"
             "- Visibility is strictly enforced via permissions"
         ),
         parameters=[
@@ -175,12 +177,19 @@ class CaseDetailView(APIView):
         tags=["cases"],
     )
     def get(self, request, case_id):
-        case = get_object_or_404(Case, id=case_id)
+        case = get_object_or_404(
+            Case.objects.annotate(
+                total_documents=Count("documents", distinct=True)
+            ),
+            id=case_id
+        )
+
         self.check_object_permissions(request, case)
 
         return Response(
             CaseDetailSerializer(case).data
         )
+
 
 
 class CaseUpdateView(APIView):
@@ -303,59 +312,50 @@ class CaseListView(APIView):
     )
     def get(self, request):
         user = request.user
-        qs = Case.objects.all()
 
-        # -------------------------
-        # Role-based visibility
-        # -------------------------
+        qs = Case.objects.annotate(
+            total_documents=Count("documents", distinct=True)
+        )
+
         case_scope = request.query_params.get("case_scope")
-        
+
         # -------------------------
         # Lawyer visibility
         # -------------------------
         if user.role == UserRoles.LAWYER:
             lawyer = Lawyer.objects.get(user=user)
-        
-            # Default: all lawyer-related cases
+
             qs = qs.filter(
                 Q(owner_lawyer=lawyer) |
                 Q(assigned_lawyers__lawyer=lawyer)
             )
-        
-            # Optional narrowing
+
             if case_scope == "personal":
                 qs = qs.filter(
                     owner_type=UserRoles.LAWYER,
                     owner_lawyer=lawyer
                 )
-        
+
             elif case_scope == "firm":
                 qs = qs.filter(
                     owner_type=UserRoles.FIRM,
                     assigned_lawyers__lawyer=lawyer
                 )
-        
-        # -------------------------
-        # Firm admin visibility
-        # -------------------------
+
         elif user.role == UserRoles.FIRM:
             firm = Firm.objects.get(user=user)
             qs = qs.filter(owner_firm=firm)
-        
-        # -------------------------
-        # Client visibility
-        # -------------------------
+
         elif user.role == UserRoles.CLIENT:
             qs = qs.filter(client_user=user)
-        
+
         else:
             return Response({"error": "Not allowed"}, status=403)
-        
 
         qs = qs.distinct()
 
         # -------------------------
-        # Filters
+        # Filters (unchanged)
         # -------------------------
         if status := request.query_params.get("status"):
             qs = qs.filter(status=status)
@@ -378,9 +378,6 @@ class CaseListView(APIView):
         if created_to := request.query_params.get("created_to"):
             qs = qs.filter(created_at__date__lte=created_to)
 
-        # -------------------------
-        # Pagination
-        # -------------------------
         paginator = DefaultPageNumberPagination()
         page = paginator.paginate_queryset(
             qs.order_by("-created_at"),

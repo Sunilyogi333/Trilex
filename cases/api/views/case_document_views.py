@@ -17,33 +17,28 @@ from cases.api.serializers import (
 )
 from cases.permissions import CanUploadCaseDocument, CanViewCaseDocuments
 from base.constants.user_roles import UserRoles
+from base.constants.case import CaseDocumentScope
+from base.pagination import DefaultPageNumberPagination
 
 
 class CaseDocumentCreateView(APIView):
-    """
-    Upload a document to a case.
-    """
-
     permission_classes = [IsAuthenticated, CanUploadCaseDocument]
 
     @extend_schema(
         summary="Upload a case document",
         description=(
-            "Upload a document related to a case.\n\n"
-            "**Who can upload:**\n"
-            "- Case owner lawyer\n"
-            "- Assigned lawyers\n"
-            "- Firm admin (for firm cases)\n"
-            "- Client (can upload their own documents)\n\n"
-            "**Client restriction:**\n"
-            "- Client-uploaded documents are only visible to the client and lawyers."
+            "Upload a document to a case.\n\n"
+            "**Document scope:**\n"
+            "- internal → lawyer / firm working file\n"
+            "- client → client-related evidence or files\n\n"
+            "**Client visibility:**\n"
+            "- Clients can only see documents they uploaded themselves"
         ),
         parameters=[
             OpenApiParameter(
                 name="case_id",
                 type=str,
                 location=OpenApiParameter.PATH,
-                description="UUID of the case",
             ),
         ],
         request=CaseDocumentCreateSerializer,
@@ -51,7 +46,6 @@ class CaseDocumentCreateView(APIView):
             201: CaseDocumentSerializer,
             400: OpenApiResponse(description="Validation error"),
             403: OpenApiResponse(description="Permission denied"),
-            404: OpenApiResponse(description="Case not found"),
         },
         tags=["cases"],
     )
@@ -86,7 +80,7 @@ class CaseDocumentCreateView(APIView):
 
 class CaseDocumentListView(APIView):
     """
-    List documents of a case with role-based visibility.
+    List documents of a case with role-based visibility and pagination.
     """
 
     permission_classes = [IsAuthenticated, CanViewCaseDocuments]
@@ -95,23 +89,31 @@ class CaseDocumentListView(APIView):
         summary="List case documents",
         description=(
             "Retrieve documents associated with a case.\n\n"
+            "**Scope filters (optional):**\n"
+            "- my → documents uploaded by the current user\n"
+            "- client → client-related documents\n"
+            "- firm → internal firm / lawyer documents\n\n"
             "**Visibility rules:**\n"
-            "- Lawyers and firm admins see all documents\n"
-            "- Clients see **only documents uploaded by themselves**\n\n"
-            "This endpoint enforces document-level access control automatically."
+            "- Clients see only documents they uploaded\n"
+            "- Lawyers and firm admins see documents based on scope\n\n"
+            "**Pagination:**\n"
+            "- page\n"
+            "- page_size"
         ),
         parameters=[
+            OpenApiParameter(name="case_id", type=str, location=OpenApiParameter.PATH),
             OpenApiParameter(
-                name="case_id",
+                name="scope",
                 type=str,
-                location=OpenApiParameter.PATH,
-                description="UUID of the case",
+                location=OpenApiParameter.QUERY,
+                description="my | client | firm",
             ),
+            OpenApiParameter(name="page", type=int, location=OpenApiParameter.QUERY),
+            OpenApiParameter(name="page_size", type=int, location=OpenApiParameter.QUERY),
         ],
         responses={
             200: CaseDocumentSerializer(many=True),
             403: OpenApiResponse(description="Permission denied"),
-            404: OpenApiResponse(description="Case not found"),
         },
         tags=["cases"],
     )
@@ -119,11 +121,44 @@ class CaseDocumentListView(APIView):
         case = get_object_or_404(Case, id=case_id)
         self.check_object_permissions(request, case)
 
-        queryset = case.documents.all()
+        user = request.user
+        scope = request.query_params.get("scope")
 
-        # Client can see only their own uploaded documents
-        if request.user == case.client_user:
-            queryset = queryset.filter(uploaded_by_type="client")
+        queryset = case.documents.all().order_by("-created_at")
 
-        serializer = CaseDocumentSerializer(queryset, many=True)
-        return Response(serializer.data)
+        # -------------------------
+        # Client visibility (strict)
+        # -------------------------
+        if user.role == UserRoles.CLIENT:
+            queryset = queryset.filter(
+                uploaded_by_type="client",
+                uploaded_by_user=user
+            )
+
+        # -------------------------
+        # Lawyer / Firm visibility
+        # -------------------------
+        else:
+            if scope == "my":
+                queryset = queryset.filter(uploaded_by_user=user)
+
+            elif scope == "client":
+                queryset = queryset.filter(document_scope="client")
+
+            elif scope == "firm":
+                # 🚨 firm scope only valid for firm-owned cases
+                if case.owner_type != UserRoles.FIRM:
+                    queryset = queryset.none()
+                else:
+                    queryset = queryset.exclude(uploaded_by_user=user)
+
+            # scope=None → show all allowed documents (default behavior)
+
+        # -------------------------
+        # Pagination
+        # -------------------------
+        paginator = DefaultPageNumberPagination()
+        page = paginator.paginate_queryset(queryset, request)
+
+        serializer = CaseDocumentSerializer(page, many=True)
+        return paginator.get_paginated_response(serializer.data)

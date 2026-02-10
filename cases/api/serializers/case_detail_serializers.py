@@ -1,9 +1,6 @@
 from rest_framework import serializers
 
 from cases.models import Case
-from cases.api.serializers.case_document_serializers import (
-    CaseDocumentSerializer,
-)
 from cases.api.serializers.case_date_serailizers import (
     CaseDateSerializer,
 )
@@ -25,8 +22,8 @@ class CaseDetailSerializer(serializers.ModelSerializer):
     client = CaseClientSerializer(read_only=True)
     waris = CaseWarisSerializer(read_only=True)
 
-    documents = CaseDocumentSerializer(many=True, read_only=True)
     dates = CaseDateSerializer(many=True, read_only=True)
+    total_documents = serializers.IntegerField(read_only=True)
 
     assigned_lawyers = serializers.SerializerMethodField()
 
@@ -46,8 +43,8 @@ class CaseDetailSerializer(serializers.ModelSerializer):
             "waris",
 
             # relations
-            "documents",
             "dates",
+            "total_documents",
             "assigned_lawyers",
 
             "created_at",
