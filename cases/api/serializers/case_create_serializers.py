@@ -1,14 +1,36 @@
 from rest_framework import serializers
 
-from cases.models import Case
+from cases.models import Case, CaseCategory
 from cases.models.case import CaseOwnerType, CourtType, CaseStatus
-from cases.models import CaseCategory
+
+from cases.api.serializers.case_client_serializers import CaseClientCreateSerializer
+from cases.api.serializers.case_waris_serializers import CaseWarisCreateSerializer
+from cases.api.serializers import (
+    CaseDocumentCreateSerializer,
+    CaseDateCreateSerializer,
+)
 
 class CaseCreateSerializer(serializers.ModelSerializer):
     owner_type = serializers.ChoiceField(choices=CaseOwnerType.choices)
+    court_type = serializers.ChoiceField(choices=CourtType.choices)
+    status = serializers.ChoiceField(choices=CaseStatus.choices)
 
     case_category = serializers.PrimaryKeyRelatedField(
         queryset=CaseCategory.objects.all()
+    )
+
+    # --- nested snapshots ---
+    client = CaseClientCreateSerializer(required=True)
+    waris = CaseWarisCreateSerializer(required=False)
+
+    # --- optional nested ---
+    documents = CaseDocumentCreateSerializer(
+        many=True,
+        required=False
+    )
+    dates = CaseDateCreateSerializer(
+        many=True,
+        required=False
     )
 
     class Meta:
@@ -21,29 +43,51 @@ class CaseCreateSerializer(serializers.ModelSerializer):
             "description",
             "status",
 
-            # client (required)
-            "client_full_name",
-            "client_address",
-            "client_email",
-            "client_phone",
-            "client_date_of_birth",
-            "client_citizenship_number",
-            "client_gender",
-
-            # optional client link
+            # optional system link
             "client_user",
 
-            # optional waris
-            "waris_full_name",
-            "waris_email",
-            "waris_address",
-            "waris_phone",
-            "waris_date_of_birth",
-            "waris_citizenship_number",
-            "waris_gender",
+            # nested
+            "client",
+            "waris",
+            "documents",
+            "dates",
         )
 
 class CaseUpdateSerializer(serializers.ModelSerializer):
+    """
+    Update serializer for Case.
+    Same payload structure as CaseCreateSerializer
+    to allow frontend to reuse the same form.
+    """
+
+    court_type = serializers.ChoiceField(
+        choices=CourtType.choices,
+        required=False
+    )
+    status = serializers.ChoiceField(
+        choices=CaseStatus.choices,
+        required=False
+    )
+
+    case_category = serializers.PrimaryKeyRelatedField(
+        queryset=CaseCategory.objects.all(),
+        required=False
+    )
+
+    # --- nested snapshots (editable) ---
+    client = CaseClientCreateSerializer(required=False)
+    waris = CaseWarisCreateSerializer(required=False)
+
+    # --- optional nested ---
+    documents = CaseDocumentCreateSerializer(
+        many=True,
+        required=False
+    )
+    dates = CaseDateCreateSerializer(
+        many=True,
+        required=False
+    )
+
     class Meta:
         model = Case
         fields = (
@@ -53,19 +97,12 @@ class CaseUpdateSerializer(serializers.ModelSerializer):
             "description",
             "status",
 
-            "client_full_name",
-            "client_address",
-            "client_email",
-            "client_phone",
-            "client_date_of_birth",
-            "client_citizenship_number",
-            "client_gender",
+            # optional system link
+            "client_user",
 
-            "waris_full_name",
-            "waris_email",
-            "waris_address",
-            "waris_phone",
-            "waris_date_of_birth",
-            "waris_citizenship_number",
-            "waris_gender",
+            # nested
+            "client",
+            "waris",
+            "documents",
+            "dates",
         )

@@ -2,20 +2,28 @@ from django.conf import settings
 from django.db import models
 
 from base.models import AbstractBaseModel
-from cases.models.case_category import CaseCategory
 from base.constants.case import CaseOwnerType, CourtType, CaseStatus
+from cases.models.case_category import CaseCategory
 
 User = settings.AUTH_USER_MODEL
 
+
 class Case(AbstractBaseModel):
-    # ---- ownership ----
+    """
+    Core case model.
+    Holds ownership, legal metadata, and relations.
+    """
+
+    # --------------------
+    # Ownership
+    # --------------------
     owner_type = models.CharField(
         max_length=20,
         choices=CaseOwnerType.choices
     )
 
     owner_lawyer = models.ForeignKey(
-       "lawyers.Lawyer",
+        "lawyers.Lawyer",
         on_delete=models.CASCADE,
         null=True,
         blank=True,
@@ -23,7 +31,7 @@ class Case(AbstractBaseModel):
     )
 
     owner_firm = models.ForeignKey(
-       "firms.Firm",
+        "firms.Firm",
         on_delete=models.CASCADE,
         null=True,
         blank=True,
@@ -37,7 +45,9 @@ class Case(AbstractBaseModel):
         related_name="created_cases"
     )
 
-    # ---- general case info ----
+    # --------------------
+    # Case metadata
+    # --------------------
     title = models.CharField(max_length=255)
 
     case_category = models.ForeignKey(
@@ -59,15 +69,9 @@ class Case(AbstractBaseModel):
         default=CaseStatus.DRAFT
     )
 
-    # ---- client snapshot (REQUIRED) ----
-    client_full_name = models.CharField(max_length=255)
-    client_address = models.CharField(max_length=255)
-    client_email = models.EmailField()
-    client_phone = models.CharField(max_length=20)
-    client_date_of_birth = models.DateField()
-    client_citizenship_number = models.CharField(max_length=100)
-    client_gender = models.CharField(max_length=20)
-
+    # --------------------
+    # Optional system link
+    # --------------------
     client_user = models.ForeignKey(
         User,
         on_delete=models.SET_NULL,
@@ -75,15 +79,6 @@ class Case(AbstractBaseModel):
         blank=True,
         related_name="client_cases"
     )
-
-    # ---- waris snapshot (OPTIONAL) ----
-    waris_full_name = models.CharField(max_length=255, blank=True)
-    waris_email = models.EmailField(blank=True)
-    waris_address = models.CharField(max_length=255, blank=True)
-    waris_phone = models.CharField(max_length=20, blank=True)
-    waris_date_of_birth = models.DateField(null=True, blank=True)
-    waris_citizenship_number = models.CharField(max_length=100, blank=True)
-    waris_gender = models.CharField(max_length=20, blank=True)
 
     def __str__(self):
         return f"Case({self.title})"
