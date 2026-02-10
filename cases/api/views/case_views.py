@@ -227,9 +227,6 @@ class CaseUpdateView(APIView):
         data = serializer.validated_data
         client_data = data.pop("client", None)
         waris_data = data.pop("waris", None)
-        documents = data.pop("documents", [])
-        dates = data.pop("dates", [])
-
         # -------------------------
         # Update case core fields
         # -------------------------
@@ -251,20 +248,6 @@ class CaseUpdateView(APIView):
                 case=case,
                 defaults=waris_data
             )
-
-        # -------------------------
-        # Append documents & dates
-        # -------------------------
-        for doc in documents:
-            CaseDocument.objects.create(
-                case=case,
-                uploaded_by_user=request.user,
-                uploaded_by_type=request.user.role.lower(),
-                **doc
-            )
-
-        for date in dates:
-            CaseDate.objects.create(case=case, **date)
 
         return Response(CaseDetailSerializer(case).data)
 
@@ -298,6 +281,15 @@ class CaseListView(APIView):
             OpenApiParameter(name="case_category", type=str, location=OpenApiParameter.QUERY),
             OpenApiParameter(name="court_type", type=str, location=OpenApiParameter.QUERY),
             OpenApiParameter(name="search", type=str, location=OpenApiParameter.QUERY),
+            OpenApiParameter(
+                             name="case_scope",
+                             type=str,
+                             location=OpenApiParameter.QUERY,
+                             description=(
+                                 "Filter lawyer cases:\n"
+                                 "- personal → cases owned by the lawyer\n"
+                                 "- firm → firm-owned cases assigned to the lawyer"
+                             ),),
             OpenApiParameter(name="created_from", type=str, location=OpenApiParameter.QUERY),
             OpenApiParameter(name="created_to", type=str, location=OpenApiParameter.QUERY),
             OpenApiParameter(name="page", type=int, location=OpenApiParameter.QUERY),
@@ -316,22 +308,49 @@ class CaseListView(APIView):
         # -------------------------
         # Role-based visibility
         # -------------------------
+        case_scope = request.query_params.get("case_scope")
+        
+        # -------------------------
+        # Lawyer visibility
+        # -------------------------
         if user.role == UserRoles.LAWYER:
             lawyer = Lawyer.objects.get(user=user)
+        
+            # Default: all lawyer-related cases
             qs = qs.filter(
                 Q(owner_lawyer=lawyer) |
                 Q(assigned_lawyers__lawyer=lawyer)
             )
-
+        
+            # Optional narrowing
+            if case_scope == "personal":
+                qs = qs.filter(
+                    owner_type=UserRoles.LAWYER,
+                    owner_lawyer=lawyer
+                )
+        
+            elif case_scope == "firm":
+                qs = qs.filter(
+                    owner_type=UserRoles.FIRM,
+                    assigned_lawyers__lawyer=lawyer
+                )
+        
+        # -------------------------
+        # Firm admin visibility
+        # -------------------------
         elif user.role == UserRoles.FIRM:
             firm = Firm.objects.get(user=user)
             qs = qs.filter(owner_firm=firm)
-
+        
+        # -------------------------
+        # Client visibility
+        # -------------------------
         elif user.role == UserRoles.CLIENT:
             qs = qs.filter(client_user=user)
-
+        
         else:
             return Response({"error": "Not allowed"}, status=403)
+        
 
         qs = qs.distinct()
 

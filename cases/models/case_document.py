@@ -4,7 +4,7 @@ from django.db import models
 from base.models import AbstractBaseModel
 from cases.models.case import Case
 from media.models import Image
-from base.constants.case import CaseDocumentFileType, CaseDocumentUploader
+from base.constants.case import CaseDocumentFileType, CaseDocumentUploader, CaseDocumentScope
 
 User = settings.AUTH_USER_MODEL
 
@@ -28,6 +28,13 @@ class CaseDocument(AbstractBaseModel):
         max_length=20,
         choices=CaseDocumentFileType.choices
     )
+
+    document_scope = models.CharField(
+    max_length=20,
+    choices=CaseDocumentScope.choices,
+    default=CaseDocumentScope.INTERNAL
+)
+
 
     uploaded_by_type = models.CharField(
         max_length=20,

@@ -33,3 +33,7 @@ class CaseDateType(models.TextChoices):
     TARIK = "tarik", "Tarik Date"
     PESI = "pesi", "Pesi Date"
     OTHER = "other", "Other"
+
+class CaseDocumentScope(models.TextChoices):
+    INTERNAL = "internal", "Internal / My File"
+    CLIENT = "client", "Client File"

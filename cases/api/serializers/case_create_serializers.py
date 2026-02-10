@@ -13,7 +13,6 @@ from cases.api.serializers.case_date_serailizers import (
 )
 
 class CaseCreateSerializer(serializers.ModelSerializer):
-    owner_type = serializers.ChoiceField(choices=CaseOwnerType.choices)
     court_type = serializers.ChoiceField(choices=CourtType.choices)
     status = serializers.ChoiceField(choices=CaseStatus.choices)
 
@@ -38,7 +37,6 @@ class CaseCreateSerializer(serializers.ModelSerializer):
     class Meta:
         model = Case
         fields = (
-            "owner_type",
             "title",
             "case_category",
             "court_type",
@@ -58,8 +56,7 @@ class CaseCreateSerializer(serializers.ModelSerializer):
 class CaseUpdateSerializer(serializers.ModelSerializer):
     """
     Update serializer for Case.
-    Same payload structure as CaseCreateSerializer
-    to allow frontend to reuse the same form.
+    Used ONLY for updating case metadata and snapshots.
     """
 
     court_type = serializers.ChoiceField(
@@ -76,19 +73,9 @@ class CaseUpdateSerializer(serializers.ModelSerializer):
         required=False
     )
 
-    # --- nested snapshots (editable) ---
+    # --- editable snapshots ---
     client = CaseClientCreateSerializer(required=False)
     waris = CaseWarisCreateSerializer(required=False)
-
-    # --- optional nested ---
-    documents = CaseDocumentCreateSerializer(
-        many=True,
-        required=False
-    )
-    dates = CaseDateCreateSerializer(
-        many=True,
-        required=False
-    )
 
     class Meta:
         model = Case
@@ -99,12 +86,8 @@ class CaseUpdateSerializer(serializers.ModelSerializer):
             "description",
             "status",
 
-            # optional system link
             "client_user",
 
-            # nested
             "client",
             "waris",
-            "documents",
-            "dates",
         )
