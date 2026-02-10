@@ -51,11 +51,11 @@ class AIQueryView(APIView):
         if not query:
             return Response({"error": "Query is required"}, status=400)
 
-        # 🔐 Role context
+        # Role context
         user_role = request.user.role
         is_client = user_role == UserRoles.CLIENT
 
-        # 1️⃣ Call AI service with ROLE
+        # Call AI service with ROLE
         try:
             ai_data = call_ai_service(
                 {
@@ -70,13 +70,13 @@ class AIQueryView(APIView):
                 status=503
             )
 
-        # 2️⃣ Normalize AI response
+        # Normalize AI response
         answer = ai_data.get("answer", "")
         raw_query_type = ai_data.get("query_type", "")
         query_type = raw_query_type.strip().lower().split()[0]
         case_category_name = ai_data.get("case_category") or None
 
-        # 3️⃣ Store history
+        # Store history
         history = AIQueryHistory.objects.create(
             user=request.user,
             query=query,
@@ -88,12 +88,15 @@ class AIQueryView(APIView):
         response_payload = {
             "answer": answer,
             "query_type": query_type,
-            "recommendations": [],
+            "recommendations": {
+                "case_category": None,
+                "lawyers": [],
+                "firms": [],
+            },
             "created_at": history.created_at,
-
         }
 
-        # 4️⃣ Recommendation logic (CLIENT ONLY)
+        # Recommendation logic (CLIENT ONLY)
         if (
             is_client
             and query_type == QueryType.RECOMMENDATION
@@ -208,7 +211,7 @@ class AIQueryHistoryListView(APIView):
                 "recommended_lawyers__user__bar_verification",
                 "recommended_firms__user__firm_verification",
             )
-            .order_by("-created_at")  # 🔥 newest first
+            .order_by("-created_at")
         )
 
         paginator = DefaultPageNumberPagination()
@@ -217,12 +220,16 @@ class AIQueryHistoryListView(APIView):
         messages = []
 
         for history in page:
-            # 🤖 AI MESSAGE FIRST
+            # AI MESSAGE FIRST
             ai_message = {
                 "sender": "ai",
                 "message": history.answer or "",
                 "query_type": history.query_type,
-                "recommendations": [],
+                "recommendations": {
+                    "case_category": None,
+                    "lawyers": [],
+                    "firms": [],
+                },
                 "created_at": history.created_at,
             }
 
@@ -258,7 +265,7 @@ class AIQueryHistoryListView(APIView):
 
             messages.append(ai_message)
 
-            # 🧑 USER MESSAGE AFTER
+            # USER MESSAGE AFTER
             messages.append({
                 "sender": "user",
                 "message": history.query,
