@@ -30,11 +30,10 @@ class CaseDocument(AbstractBaseModel):
     )
 
     document_scope = models.CharField(
-    max_length=20,
-    choices=CaseDocumentScope.choices,
-    default=CaseDocumentScope.INTERNAL
-)
-
+        max_length=20,
+        choices=CaseDocumentScope.choices,
+        default=CaseDocumentScope.INTERNAL
+    )
 
     uploaded_by_type = models.CharField(
         max_length=20,

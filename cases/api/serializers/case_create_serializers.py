@@ -1,16 +1,11 @@
 from rest_framework import serializers
-
 from cases.models import Case, CaseCategory
-from cases.models.case import CaseOwnerType, CourtType, CaseStatus
+from cases.models.case import CourtType, CaseStatus
+from clients.models import Client
 
-from cases.api.serializers.case_client_serializers import CaseClientCreateSerializer
+from cases.api.serializers.case_client_details_serializers import CaseClientDetailsCreateSerializer
 from cases.api.serializers.case_waris_serializers import CaseWarisCreateSerializer
-from cases.api.serializers.case_document_serializers import (
-    CaseDocumentCreateSerializer,
-)
-from cases.api.serializers.case_date_serailizers import (
-    CaseDateCreateSerializer,
-)
+
 
 class CaseCreateSerializer(serializers.ModelSerializer):
     court_type = serializers.ChoiceField(choices=CourtType.choices)
@@ -20,19 +15,16 @@ class CaseCreateSerializer(serializers.ModelSerializer):
         queryset=CaseCategory.objects.all()
     )
 
-    # --- nested snapshots ---
-    client = CaseClientCreateSerializer(required=True)
-    waris = CaseWarisCreateSerializer(required=False)
+    # 🔹 NEW: link to Client profile
+    client = serializers.PrimaryKeyRelatedField(
+        queryset=Client.objects.all(),
+        required=False,
+        allow_null=True
+    )
 
-    # --- optional nested ---
-    documents = CaseDocumentCreateSerializer(
-        many=True,
-        required=False
-    )
-    dates = CaseDateCreateSerializer(
-        many=True,
-        required=False
-    )
+    # snapshot data
+    client_details = CaseClientDetailsCreateSerializer(required=True)
+    waris = CaseWarisCreateSerializer(required=False)
 
     class Meta:
         model = Case
@@ -42,27 +34,19 @@ class CaseCreateSerializer(serializers.ModelSerializer):
             "court_type",
             "description",
             "status",
-
-            # optional system link
-            "client_user",
-
-            # nested
-            "client",
+            "client",           # profile link
+            "client_details",  # immutable snapshot
             "waris",
-            "documents",
-            "dates",
         )
 
+
 class CaseUpdateSerializer(serializers.ModelSerializer):
-    """
-    Update serializer for Case.
-    Used ONLY for updating case metadata and snapshots.
-    """
 
     court_type = serializers.ChoiceField(
         choices=CourtType.choices,
         required=False
     )
+
     status = serializers.ChoiceField(
         choices=CaseStatus.choices,
         required=False
@@ -73,8 +57,13 @@ class CaseUpdateSerializer(serializers.ModelSerializer):
         required=False
     )
 
-    # --- editable snapshots ---
-    client = CaseClientCreateSerializer(required=False)
+    client = serializers.PrimaryKeyRelatedField(
+        queryset=Client.objects.all(),
+        required=False,
+        allow_null=True
+    )
+
+    client_details = CaseClientDetailsCreateSerializer(required=False)
     waris = CaseWarisCreateSerializer(required=False)
 
     class Meta:
@@ -85,9 +74,7 @@ class CaseUpdateSerializer(serializers.ModelSerializer):
             "court_type",
             "description",
             "status",
-
-            "client_user",
-
             "client",
+            "client_details",
             "waris",
         )

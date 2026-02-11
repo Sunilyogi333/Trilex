@@ -1,19 +1,18 @@
 from django.db import models
-
 from base.models import AbstractBaseModel
 from cases.models.case import Case
 
 
-class CaseClient(AbstractBaseModel):
+class CaseClientDetails(AbstractBaseModel):
     """
     Immutable snapshot of client details for a case.
-    Exactly ONE client per case.
+    Exactly ONE snapshot per case.
     """
 
     case = models.OneToOneField(
         Case,
         on_delete=models.CASCADE,
-        related_name="client"
+        related_name="client_details"
     )
 
     full_name = models.CharField(max_length=255)
@@ -25,4 +24,4 @@ class CaseClient(AbstractBaseModel):
     gender = models.CharField(max_length=20)
 
     def __str__(self):
-        return f"CaseClient({self.full_name})"
+        return f"CaseClientDetails({self.full_name})"

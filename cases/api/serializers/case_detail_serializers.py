@@ -1,15 +1,8 @@
 from rest_framework import serializers
-
 from cases.models import Case
-from cases.api.serializers.case_date_serailizers import (
-    CaseDateSerializer,
-)
-from cases.api.serializers.case_client_serializers import (
-    CaseClientSerializer,
-)
-from cases.api.serializers.case_waris_serializers import (
-    CaseWarisSerializer,
-)
+from cases.api.serializers.case_date_serailizers import CaseDateSerializer
+from cases.api.serializers.case_client_details_serializers import CaseClientDetailsSerializer
+from cases.api.serializers.case_waris_serializers import CaseWarisSerializer
 
 
 class CaseDetailSerializer(serializers.ModelSerializer):
@@ -18,8 +11,11 @@ class CaseDetailSerializer(serializers.ModelSerializer):
     Used for case detail view and dashboards.
     """
 
-    # nested read-only relations
-    client = CaseClientSerializer(read_only=True)
+    # profile link (Client FK)
+    client = serializers.PrimaryKeyRelatedField(read_only=True)
+
+    # snapshot
+    client_details = CaseClientDetailsSerializer(read_only=True)
     waris = CaseWarisSerializer(read_only=True)
 
     dates = CaseDateSerializer(many=True, read_only=True)
@@ -38,8 +34,8 @@ class CaseDetailSerializer(serializers.ModelSerializer):
             "description",
             "status",
 
-            # nested snapshots
             "client",
+            "client_details",
             "waris",
 
             # relations
@@ -52,9 +48,6 @@ class CaseDetailSerializer(serializers.ModelSerializer):
         )
 
     def get_assigned_lawyers(self, obj):
-        """
-        Returns lawyers assigned to the case with role & permissions.
-        """
         return [
             {
                 "lawyer_id": cl.lawyer.id,
@@ -62,7 +55,5 @@ class CaseDetailSerializer(serializers.ModelSerializer):
                 "role": cl.role,
                 "can_edit": cl.can_edit,
             }
-            for cl in obj.assigned_lawyers.select_related(
-                "lawyer__user"
-            )
+            for cl in obj.assigned_lawyers.select_related("lawyer__user")
         ]

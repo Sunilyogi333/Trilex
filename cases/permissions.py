@@ -1,20 +1,36 @@
 # cases/permissions.py
+
 from rest_framework.permissions import BasePermission
 
 from cases.models import Case, CaseLawyer
-from firms.models import Firm
-from lawyers.models import Lawyer
 from base.constants.user_roles import UserRoles
+
+
+# ---------------------------------------------------
+# Helper checks
+# ---------------------------------------------------
 
 def is_case_owner_lawyer(user, case: Case) -> bool:
     if user.role != UserRoles.LAWYER:
         return False
-    return case.owner_type == "lawyer" and case.owner_lawyer.user_id == user.id
+
+    return (
+        case.owner_type == UserRoles.LAWYER
+        and case.owner_lawyer
+        and case.owner_lawyer.user_id == user.id
+    )
+
 
 def is_case_owner_firm_admin(user, case: Case) -> bool:
     if user.role != UserRoles.FIRM:
         return False
-    return case.owner_type == "firm" and case.owner_firm.user_id == user.id
+
+    return (
+        case.owner_type == UserRoles.FIRM
+        and case.owner_firm
+        and case.owner_firm.user_id == user.id
+    )
+
 
 def is_assigned_lawyer(user, case: Case, require_edit: bool = False) -> bool:
     if user.role != UserRoles.LAWYER:
@@ -33,8 +49,24 @@ def is_assigned_lawyer(user, case: Case, require_edit: bool = False) -> bool:
 
     return True
 
+
 def is_case_client(user, case: Case) -> bool:
-    return case.client_user_id == user.id
+    """
+    Checks if the authenticated user is the client
+    linked to this case.
+    """
+    if user.role != UserRoles.CLIENT:
+        return False
+
+    if not case.client:
+        return False
+
+    return case.client.user_id == user.id
+
+
+# ---------------------------------------------------
+# Permission Classes
+# ---------------------------------------------------
 
 class CanViewCase(BasePermission):
     def has_object_permission(self, request, view, obj: Case):
@@ -49,6 +81,7 @@ class CanViewCase(BasePermission):
             is_assigned_lawyer(user, obj),
             is_case_client(user, obj),
         ])
+
 
 class CanEditCase(BasePermission):
     def has_object_permission(self, request, view, obj: Case):
@@ -73,6 +106,7 @@ class CanAssignCaseLawyers(BasePermission):
 
         return is_case_owner_firm_admin(user, obj)
 
+
 class CanUploadCaseDocument(BasePermission):
     def has_object_permission(self, request, view, obj: Case):
         user = request.user
@@ -87,9 +121,11 @@ class CanUploadCaseDocument(BasePermission):
             is_case_client(user, obj),
         ])
 
+
 class CanViewCaseDocuments(BasePermission):
     def has_object_permission(self, request, view, obj: Case):
         return CanViewCase().has_object_permission(request, view, obj)
+
 
 class CanManageCaseDates(BasePermission):
     def has_object_permission(self, request, view, obj: Case):

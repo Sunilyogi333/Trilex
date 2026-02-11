@@ -70,14 +70,14 @@ class Case(AbstractBaseModel):
     )
 
     # --------------------
-    # Optional system link
+    # Client profile link (UPDATED)
     # --------------------
-    client_user = models.ForeignKey(
-        User,
+    client = models.ForeignKey(
+        "clients.Client",
         on_delete=models.SET_NULL,
         null=True,
         blank=True,
-        related_name="client_cases"
+        related_name="cases"
     )
 
     def __str__(self):

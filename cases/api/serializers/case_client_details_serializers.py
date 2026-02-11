@@ -1,16 +1,16 @@
 from rest_framework import serializers
 
-from cases.models import CaseClient
+from cases.models import CaseClientDetails
 
 
-class CaseClientCreateSerializer(serializers.ModelSerializer):
+class CaseClientDetailsCreateSerializer(serializers.ModelSerializer):
     """
     Snapshot of client details for a case.
     Required at case creation.
     """
 
     class Meta:
-        model = CaseClient
+        model = CaseClientDetails
         fields = (
             "full_name",
             "address",
@@ -22,13 +22,13 @@ class CaseClientCreateSerializer(serializers.ModelSerializer):
         )
 
 
-class CaseClientSerializer(serializers.ModelSerializer):
+class CaseClientDetailsSerializer(serializers.ModelSerializer):
     """
     Read serializer for case client.
     """
 
     class Meta:
-        model = CaseClient
+        model = CaseClientDetails
         fields = (
             "id",
             "full_name",
