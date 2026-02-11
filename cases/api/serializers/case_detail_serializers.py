@@ -3,18 +3,15 @@ from cases.models import Case
 from cases.api.serializers.case_date_serailizers import CaseDateSerializer
 from cases.api.serializers.case_client_details_serializers import CaseClientDetailsSerializer
 from cases.api.serializers.case_waris_serializers import CaseWarisSerializer
+from clients.api.serializers import (
+    CaseClientProfileSerializer
+)
 
 
 class CaseDetailSerializer(serializers.ModelSerializer):
-    """
-    Full detail serializer for a case.
-    Used for case detail view and dashboards.
-    """
 
-    # profile link (Client FK)
-    client = serializers.PrimaryKeyRelatedField(read_only=True)
+    client = CaseClientProfileSerializer(read_only=True)
 
-    # snapshot
     client_details = CaseClientDetailsSerializer(read_only=True)
     waris = CaseWarisSerializer(read_only=True)
 
@@ -38,7 +35,6 @@ class CaseDetailSerializer(serializers.ModelSerializer):
             "client_details",
             "waris",
 
-            # relations
             "dates",
             "total_documents",
             "assigned_lawyers",

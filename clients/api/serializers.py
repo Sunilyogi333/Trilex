@@ -163,3 +163,17 @@ class ClientMeSerializer(serializers.Serializer):
     user = ClientUserSerializer()
     profile = ClientProfileSerializer()
     verification = IDVerificationMeSerializer(allow_null=True)
+
+class CaseClientProfileSerializer(serializers.ModelSerializer):
+    user = ClientUserSerializer(read_only=True)
+    verification = ClientPublicVerificationSerializer(
+        read_only=True
+    )
+
+    class Meta:
+        model = Client
+        fields = (
+            "id",
+            "user",
+            "verification",
+        )

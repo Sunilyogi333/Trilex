@@ -28,6 +28,8 @@ from cases.api.serializers import (
     CaseUpdateSerializer,
     CaseDetailSerializer,
 )
+from cases.models.case_date import CaseDate
+from cases.models.case_document import CaseDocument
 from cases.permissions import CanViewCase, CanEditCase
 
 from lawyers.models import Lawyer
@@ -52,12 +54,13 @@ class CaseCreateView(APIView):
             "- Lawyer-created cases are automatically assigned as lead lawyer\n"
             "- Firm-created cases can later have multiple lawyers assigned\n"
             "- Client profile linking is optional\n"
-            "- Client details are stored as immutable snapshot\n"
-            "- Waris details are optional\n\n"
+            "- Client identity snapshot is required\n"
+            "- Waris details are optional\n"
+            "- Documents and dates can be created during case creation\n\n"
             "**Important Notes:**\n"
             "- Operation is atomic\n"
-            "- Documents are NOT created here (separate API)\n"
-            "- Case ownership is automatically derived from logged-in user"
+            "- Reverse relations (documents/dates) are created manually\n"
+            "- Case ownership is derived from logged-in user"
         ),
         request=CaseCreateSerializer,
         responses={
@@ -69,17 +72,26 @@ class CaseCreateView(APIView):
     )
     @transaction.atomic
     def post(self, request):
+
         serializer = CaseCreateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
         data = serializer.validated_data
 
+        # -------------------------------------------------
+        # Extract nested & relational data
+        # -------------------------------------------------
         client_profile = data.pop("client", None)
         client_details_data = data.pop("client_details")
         waris_data = data.pop("waris", None)
+        documents_data = data.pop("documents", [])
+        dates_data = data.pop("dates", [])
 
         user = request.user
 
+        # -------------------------------------------------
+        # Create Case based on role
+        # -------------------------------------------------
         if user.role == UserRoles.LAWYER:
             lawyer = Lawyer.objects.select_related("user").get(user=user)
 
@@ -91,6 +103,7 @@ class CaseCreateView(APIView):
                 **data
             )
 
+            # Auto-assign as lead lawyer
             CaseLawyer.objects.create(
                 case=case,
                 lawyer=lawyer,
@@ -108,18 +121,79 @@ class CaseCreateView(APIView):
                 client=client_profile,
                 **data
             )
-        else:
-            return Response({"error": "Not allowed"}, status=403)
 
+        else:
+            return Response(
+                {"error": "Not allowed to create case"},
+                status=403
+            )
+
+        # -------------------------------------------------
+        # Create Client Snapshot (OneToOne)
+        # -------------------------------------------------
         CaseClientDetails.objects.create(
             case=case,
             **client_details_data
         )
 
+        # -------------------------------------------------
+        # Create Waris (optional)
+        # -------------------------------------------------
         if waris_data:
-            CaseWaris.objects.create(case=case, **waris_data)
+            CaseWaris.objects.create(
+                case=case,
+                **waris_data
+            )
 
-        return Response(CaseDetailSerializer(case).data, status=201)
+        # -------------------------------------------------
+        # Create Documents (optional, append-only)
+        # -------------------------------------------------
+        for doc in documents_data:
+            CaseDocument.objects.create(
+                case=case,
+                uploaded_by_user=user,
+                uploaded_by_type=user.role.lower(),
+                **doc
+            )
+
+        # -------------------------------------------------
+        # Create Dates (optional)
+        # -------------------------------------------------
+        for date in dates_data:
+            CaseDate.objects.create(
+                case=case,
+                **date
+            )
+
+        # -------------------------------------------------
+        # Return full annotated detail
+        # -------------------------------------------------
+        case = (
+            Case.objects
+            .select_related(
+                "owner_lawyer__user",
+                "owner_firm__user",
+                "client",
+                "client_details",
+            )
+            .prefetch_related(
+                Prefetch(
+                    "assigned_lawyers",
+                    queryset=CaseLawyer.objects.select_related("lawyer__user")
+                ),
+                "dates",
+                "waris",
+            )
+            .annotate(
+                total_documents=Count("documents", distinct=True)
+            )
+            .get(id=case.id)
+        )
+
+        return Response(
+            CaseDetailSerializer(case).data,
+            status=201
+        )
 
 
 # =========================================================

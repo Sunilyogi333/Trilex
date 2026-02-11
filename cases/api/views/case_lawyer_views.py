@@ -14,6 +14,7 @@ from cases.models import Case, CaseLawyer
 from cases.api.serializers import CaseLawyerAssignSerializer
 from cases.permissions import CanAssignCaseLawyers
 from firms.models import FirmMember
+from base.constants.case import CaseLawyerRole
 
 
 class CaseLawyerAssignView(APIView):
@@ -24,17 +25,17 @@ class CaseLawyerAssignView(APIView):
     permission_classes = [IsAuthenticated, CanAssignCaseLawyers]
 
     @extend_schema(
-        summary="Assign a lawyer to a case",
+        summary="Assign lawyer to case",
         description=(
             "Assign a lawyer to a firm-owned case.\n\n"
-            "**Rules & constraints:**\n"
-            "- Only the firm owner/admin who created the case can assign lawyers\n"
-            "- The lawyer **must be a member of the firm**\n"
-            "- A lawyer can be assigned only once per case\n"
-            "- Assigned lawyers can collaborate on the case based on permissions\n\n"
-            "**Role & permissions:**\n"
-            "- You may optionally define the lawyer's role (lead / assistant)\n"
-            "- You may control whether the lawyer can edit the case"
+            "**Rules & Constraints:**\n"
+            "- Only firm admin who owns the case can assign lawyers\n"
+            "- Lawyer must be a member of the firm\n"
+            "- Lawyer can be assigned only once per case\n\n"
+            "**Important:**\n"
+            "- All assigned lawyers have equal power\n"
+            "- Role is automatically set to 'assistant'\n"
+            "- can_edit is automatically set to True"
         ),
         parameters=[
             OpenApiParameter(
@@ -56,6 +57,7 @@ class CaseLawyerAssignView(APIView):
         tags=["cases"],
     )
     def post(self, request, case_id):
+
         case = get_object_or_404(Case, id=case_id)
         self.check_object_permissions(request, case)
 
@@ -64,17 +66,32 @@ class CaseLawyerAssignView(APIView):
 
         lawyer = serializer.validated_data["lawyer"]
 
-        # Ensure lawyer belongs to the firm that owns the case
+        # Ensure case is firm-owned
+        if not case.owner_firm:
+            return Response(
+                {"error": "Only firm-owned cases can have assigned lawyers"},
+                status=400
+            )
+
+        # Ensure lawyer belongs to firm
         FirmMember.objects.get(
             firm=case.owner_firm,
             lawyer=lawyer
         )
 
+        # Prevent duplicate assignment
+        if CaseLawyer.objects.filter(case=case, lawyer=lawyer).exists():
+            return Response(
+                {"error": "Lawyer already assigned to this case"},
+                status=400
+            )
+
+        # Auto-assign role + permissions
         CaseLawyer.objects.create(
             case=case,
             lawyer=lawyer,
-            role=serializer.validated_data.get("role", "assistant"),
-            can_edit=serializer.validated_data.get("can_edit", True),
+            role=CaseLawyerRole.ASSISTANT,
+            can_edit=True,
         )
 
         return Response(

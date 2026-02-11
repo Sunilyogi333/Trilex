@@ -296,6 +296,12 @@ class ClientListView(APIView):
         parameters=[
             OpenApiParameter("page", int, OpenApiParameter.QUERY),
             OpenApiParameter("page_size", int, OpenApiParameter.QUERY),
+            OpenApiParameter(
+                name="search",
+                type=str,
+                location=OpenApiParameter.QUERY,
+                description="Search clients by full name or email",
+            ),
         ],
         responses={
             200: ClientPublicSerializer(many=True),
@@ -305,6 +311,7 @@ class ClientListView(APIView):
     )
     def get(self, request):
         admin = is_admin_user(request.user)
+        search = request.query_params.get("search")
         qs = Client.objects.select_related("user")
 
         if not admin:
@@ -315,6 +322,14 @@ class ClientListView(APIView):
         else:
             serializer_class = ClientAdminSerializer
 
+        if search:
+            qs = qs.filter(
+                user__client_verification__full_name__icontains=search
+            ) | qs.filter(
+                user__email__icontains=search
+            )
+        
+        qs.distinct()
         paginator = DefaultPageNumberPagination()
         page = paginator.paginate_queryset(qs, request)
 
