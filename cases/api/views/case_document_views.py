@@ -91,7 +91,7 @@ class CaseDocumentListView(APIView):
             " CLIENT USER:\n"
             "- Always sees ONLY documents they uploaded themselves.\n"
             "- Scope filter is ignored.\n\n"
-            "⚖ LAWYER /  FIRM ADMIN:\n\n"
+            " LAWYER /  FIRM ADMIN:\n\n"
             "Optional `scope` query parameter controls filtering:\n\n"
             " scope=my\n"
             "- Returns documents uploaded by the current user\n"
