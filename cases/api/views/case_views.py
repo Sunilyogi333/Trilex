@@ -419,6 +419,7 @@ class CaseListView(APIView):
             "owner_firm__user",
             "client",
             "client_details",
+            "case_category",
         ).prefetch_related(
             Prefetch(
                 "assigned_lawyers",

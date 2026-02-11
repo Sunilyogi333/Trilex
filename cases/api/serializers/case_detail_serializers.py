@@ -6,6 +6,8 @@ from cases.api.serializers.case_waris_serializers import CaseWarisSerializer
 from clients.api.serializers import (
     CaseClientProfileSerializer
 )
+from cases.api.serializers.case_category_serializers import CaseCategorySerializer
+
 
 
 class CaseDetailSerializer(serializers.ModelSerializer):
@@ -19,6 +21,8 @@ class CaseDetailSerializer(serializers.ModelSerializer):
     total_documents = serializers.IntegerField(read_only=True)
 
     assigned_lawyers = serializers.SerializerMethodField()
+
+    case_category = CaseCategorySerializer(read_only=True)
 
     class Meta:
         model = Case
