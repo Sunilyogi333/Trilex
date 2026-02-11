@@ -79,84 +79,125 @@ class CaseDocumentCreateView(APIView):
 
 
 class CaseDocumentListView(APIView):
-    """
-    List documents of a case with role-based visibility and pagination.
-    """
-
     permission_classes = [IsAuthenticated, CanViewCaseDocuments]
 
     @extend_schema(
         summary="List case documents",
         description=(
             "Retrieve documents associated with a case.\n\n"
-            "**Scope filters (optional):**\n"
-            "- my → documents uploaded by the current user\n"
-            "- client → client-related documents\n"
-            "- firm → internal firm / lawyer documents\n\n"
-            "**Visibility rules:**\n"
-            "- Clients see only documents they uploaded\n"
-            "- Lawyers and firm admins see documents based on scope\n\n"
-            "**Pagination:**\n"
+            "--------------------------------------------\n"
+            " VISIBILITY RULES\n"
+            "--------------------------------------------\n\n"
+            " CLIENT USER:\n"
+            "- Always sees ONLY documents they uploaded themselves.\n"
+            "- Scope filter is ignored.\n\n"
+            "⚖ LAWYER /  FIRM ADMIN:\n\n"
+            "Optional `scope` query parameter controls filtering:\n\n"
+            " scope=my\n"
+            "- Returns documents uploaded by the current user\n"
+            "- Only documents with scope = internal\n\n"
+            " scope=firm\n"
+            "- Only valid for firm-owned cases\n"
+            "- Returns internal documents uploaded by:\n"
+            "  • Other assigned lawyers\n"
+            "  • The firm\n"
+            "- Excludes current user's uploads\n\n"
+            " scope=client\n"
+            "- Returns all documents where scope = client\n"
+            "- Includes uploads by:\n"
+            "  • Client\n"
+            "  • Current lawyer\n"
+            "  • Other lawyers\n"
+            "  • Firm\n\n"
+            "If no scope is provided:\n"
+            "- All documents visible to the role are returned.\n\n"
+            "--------------------------------------------\n"
+            " PAGINATION SUPPORTED\n"
             "- page\n"
-            "- page_size"
+            "- page_size\n"
         ),
         parameters=[
-            OpenApiParameter(name="case_id", type=str, location=OpenApiParameter.PATH),
+            OpenApiParameter(
+                name="case_id",
+                type=str,
+                location=OpenApiParameter.PATH,
+                description="UUID of the case",
+            ),
             OpenApiParameter(
                 name="scope",
                 type=str,
                 location=OpenApiParameter.QUERY,
-                description="my | client | firm",
+                description="Filter by scope: my | firm | client",
             ),
-            OpenApiParameter(name="page", type=int, location=OpenApiParameter.QUERY),
-            OpenApiParameter(name="page_size", type=int, location=OpenApiParameter.QUERY),
+            OpenApiParameter(
+                name="page",
+                type=int,
+                location=OpenApiParameter.QUERY,
+            ),
+            OpenApiParameter(
+                name="page_size",
+                type=int,
+                location=OpenApiParameter.QUERY,
+            ),
         ],
         responses={
             200: CaseDocumentSerializer(many=True),
             403: OpenApiResponse(description="Permission denied"),
+            404: OpenApiResponse(description="Case not found"),
         },
         tags=["cases"],
     )
     def get(self, request, case_id):
+
         case = get_object_or_404(Case, id=case_id)
         self.check_object_permissions(request, case)
 
         user = request.user
         scope = request.query_params.get("scope")
 
-        queryset = case.documents.all().order_by("-created_at")
+        queryset = case.documents.select_related(
+            "uploaded_by_user",
+            "file"
+        ).order_by("-created_at")
 
-        # -------------------------
-        # Client visibility (strict)
-        # -------------------------
+        # CLIENT USER (STRICT VISIBILITY)
         if user.role == UserRoles.CLIENT:
             queryset = queryset.filter(
                 uploaded_by_type="client",
                 uploaded_by_user=user
             )
 
-        # -------------------------
-        # Lawyer / Firm visibility
-        # -------------------------
+        # LAWYER / FIRM ADMIN
         else:
+
+            # MY : My internal documents only
             if scope == "my":
-                queryset = queryset.filter(uploaded_by_user=user)
+                queryset = queryset.filter(
+                    uploaded_by_user=user,
+                    document_scope=CaseDocumentScope.INTERNAL
+                )
 
+            # CLIENT : All client-scope documents
             elif scope == "client":
-                queryset = queryset.filter(document_scope="client")
+                queryset = queryset.filter(
+                    document_scope=CaseDocumentScope.CLIENT
+                )
 
+            # FIRM : Other lawyers + firm internal docs
             elif scope == "firm":
-                # 🚨 firm scope only valid for firm-owned cases
+
+                # Only valid for firm-owned cases
                 if case.owner_type != UserRoles.FIRM:
                     queryset = queryset.none()
                 else:
-                    queryset = queryset.exclude(uploaded_by_user=user)
+                    queryset = queryset.filter(
+                        document_scope=CaseDocumentScope.INTERNAL
+                    ).exclude(
+                        uploaded_by_user_id=user.id
+                    )
 
-            # scope=None → show all allowed documents (default behavior)
+            # If scope is None : return all documents
 
-        # -------------------------
-        # Pagination
-        # -------------------------
         paginator = DefaultPageNumberPagination()
         page = paginator.paginate_queryset(queryset, request)
 
