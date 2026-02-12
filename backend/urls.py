@@ -5,42 +5,54 @@ URL configuration for backend project.
 import os
 from django.conf import settings
 from django.contrib import admin
-from django.http import FileResponse
+from django.http import FileResponse, HttpResponse
 from django.urls import path, include
 
 from drf_spectacular.views import (
+    SpectacularAPIView,
     SpectacularSwaggerView,
     SpectacularRedocView,
 )
 
-# Serve Custom WebSocket OpenAPI YAML
-def custom_openapi_yaml(request):
+# -------------------------------
+# Serve WebSocket OpenAPI YAML
+# -------------------------------
+def websocket_docs_yaml(request):
     file_path = os.path.join(
         settings.BASE_DIR,
         "docs",
         "chat-websocket-openapi.yaml",
     )
+
+    if not os.path.exists(file_path):
+        return HttpResponse("WebSocket docs not found", status=404)
+
     return FileResponse(open(file_path, "rb"), content_type="application/yaml")
 
 
 urlpatterns = [
     path("admin/", admin.site.urls),
 
-    # 🔥 Custom WebSocket OpenAPI YAML
-    path("api/openapi.yaml", custom_openapi_yaml, name="custom-openapi-yaml"),
+    # REST OpenAPI
+    path("api/openapi.json", SpectacularAPIView.as_view(), name="openapi-schema"),
 
-    # Swagger UI
     path(
         "api/docs/swagger/",
-        SpectacularSwaggerView.as_view(url_name="custom-openapi-yaml"),
+        SpectacularSwaggerView.as_view(url_name="openapi-schema"),
         name="swagger-ui",
     ),
 
-    # Redoc UI
     path(
         "api/docs/redoc/",
-        SpectacularRedocView.as_view(url_name="custom-openapi-yaml"),
+        SpectacularRedocView.as_view(url_name="openapi-schema"),
         name="redoc-ui",
+    ),
+
+    # 🔥 WebSocket Docs (Separate)
+    path(
+        "api/docs/websocket/",
+        websocket_docs_yaml,
+        name="websocket-docs",
     ),
 
     # REST APIs
