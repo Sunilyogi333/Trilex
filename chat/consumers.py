@@ -83,16 +83,16 @@ class SocketConsumer(AsyncWebsocketConsumer):
             self.channel_name
         )
 
-        # 🔥 Deliver ALL pending messages in this room
-        pending_messages = await self.get_undelivered_messages(room_id)
+        # 🔥 Optimized delivery: only latest message
+        latest_message = await self.get_latest_message(room_id)
 
-        for msg in pending_messages:
+        if latest_message and latest_message["sender_id"] != str(self.user.id):
             await self.channel_layer.group_send(
-                f"user_{msg['sender_id']}",
+                f"user_{latest_message['sender_id']}",
                 {
                     "type": "message_delivered",
                     "room_id": room_id,
-                    "message_id": msg["id"],
+                    "message_id": latest_message["id"],
                     "delivered_to": str(self.user.id),
                 }
             )
@@ -138,7 +138,7 @@ class SocketConsumer(AsyncWebsocketConsumer):
 
         message = await self.save_message(room_id, message_text)
 
-        # 1️⃣ SENT ACK
+        # 1️⃣ message_sent (DB ACK)
         await self.send(json.dumps({
             "type": "message_sent",
             "client_temp_id": client_temp_id,
@@ -222,6 +222,23 @@ class SocketConsumer(AsyncWebsocketConsumer):
         }
 
     @database_sync_to_async
+    def get_latest_message(self, room_id):
+        message = (
+            ChatMessage.objects
+            .filter(room_id=room_id)
+            .order_by("-created_at")
+            .first()
+        )
+
+        if not message:
+            return None
+
+        return {
+            "id": str(message.id),
+            "sender_id": str(message.sender.id),
+        }
+
+    @database_sync_to_async
     def get_room_participants(self, room_id):
         return list(
             ChatParticipant.objects.filter(room_id=room_id)
@@ -231,21 +248,3 @@ class SocketConsumer(AsyncWebsocketConsumer):
     @database_sync_to_async
     def mark_room_read(self, room_id):
         MessageService.mark_room_as_read(room_id, self.user)
-
-    @database_sync_to_async
-    def get_undelivered_messages(self, room_id):
-        """
-        Get all messages in this room
-        sent by others and not yet read by this user
-        """
-        messages = ChatMessage.objects.filter(
-            room_id=room_id
-        ).exclude(sender=self.user)
-
-        return [
-            {
-                "id": str(m.id),
-                "sender_id": str(m.sender.id)
-            }
-            for m in messages
-        ]

@@ -2,7 +2,7 @@ openapi: 3.0.3
 
 info:
   title: Trilex Chat WebSocket API
-  version: 2.0.0
+  version: 2.1.0
   description: |
     WebSocket documentation for Trilex Chat System.
 
@@ -13,13 +13,23 @@ info:
     PROFESSIONAL MESSAGE LIFECYCLE
     ------------------------------
 
-    1️⃣ Frontend sends message with temporary UUID (client_temp_id)
-    2️⃣ Server saves message and returns message_sent (ACK)
-    3️⃣ Server broadcasts chat_message to room
-    4️⃣ Recipient confirms delivery via message_received
-    5️⃣ Server sends message_delivered to sender
-    6️⃣ Recipient marks room read
-    7️⃣ Server sends message_read event
+    1️ Frontend sends message with temporary UUID (client_temp_id)
+    2️ Server saves message and returns message_sent (ACK)
+    3️ Server broadcasts chat_message to room
+    4️ When recipient joins the room, server marks the latest message as delivered
+    5️ Server sends message_delivered to sender
+    6️ Recipient marks room read
+    7️ Server sends message_read event
+
+    ---------------------------------
+    DELIVERY STRATEGY (Optimized)
+    ---------------------------------
+
+    - Delivery is NOT triggered per message manually.
+    - Delivery is triggered automatically when recipient joins the room.
+    - Only the latest pending message is marked as delivered.
+    - Frontend marks earlier messages as delivered automatically.
+    - This prevents event flooding and reduces socket traffic.
 
 servers:
   - url: ws://127.0.0.1:8000
@@ -68,26 +78,24 @@ paths:
 
           switch(data.type) {
 
+            case "room_joined":
+              console.log("Joined room");
+              break;
+
             case "message_sent":
-              // Replace temp message with real ID
+              // Replace temp message with real DB ID
               break;
 
             case "chat_message":
-              // Show message in UI
-              // Immediately confirm delivery
-              socket.send(JSON.stringify({
-                action: "message_received",
-                room_id: data.room_id,
-                message_id: data.message_id
-              }));
+              // Render message in UI
               break;
 
             case "message_delivered":
-              // Update ✔✔ status
+              // Show double tick ✔✔
               break;
 
             case "message_read":
-              // Update blue ticks
+              // Show blue tick 👁
               break;
           }
         };
@@ -100,6 +108,13 @@ paths:
             room_id: "ROOM_ID",
             message: text,
             client_temp_id: tempId
+          }));
+        }
+
+        function markRoomRead(roomId) {
+          socket.send(JSON.stringify({
+            action: "mark_read",
+            room_id: roomId
           }));
         }
         ```
@@ -136,6 +151,18 @@ components:
           type: string
           example: 8ba73eaa-414e-45f2-b3a6-b1e5cb77927c
 
+    LeaveRoomRequest:
+      type: object
+      required:
+        - action
+        - room_id
+      properties:
+        action:
+          type: string
+          example: leave_room
+        room_id:
+          type: string
+
     SendMessageRequest:
       type: object
       required:
@@ -155,21 +182,6 @@ components:
         client_temp_id:
           type: string
           example: temp-uuid-1234
-
-    MessageReceivedRequest:
-      type: object
-      required:
-        - action
-        - room_id
-        - message_id
-      properties:
-        action:
-          type: string
-          example: message_received
-        room_id:
-          type: string
-        message_id:
-          type: string
 
     MarkReadRequest:
       type: object
@@ -193,6 +205,15 @@ components:
         type:
           type: string
           example: room_joined
+        room_id:
+          type: string
+
+    RoomLeftResponse:
+      type: object
+      properties:
+        type:
+          type: string
+          example: room_left
         room_id:
           type: string
 
@@ -261,20 +282,29 @@ components:
 x-websocket-actions:
 
   join_room:
-    description: Join a chat room after WebSocket connection.
+    description: |
+      Join a chat room after WebSocket connection.
+      Automatically triggers delivery for latest pending message.
     request:
       $ref: '#/components/schemas/JoinRoomRequest'
     response:
       $ref: '#/components/schemas/RoomJoinedResponse'
+
+  leave_room:
+    description: Leave a chat room.
+    request:
+      $ref: '#/components/schemas/LeaveRoomRequest'
+    response:
+      $ref: '#/components/schemas/RoomLeftResponse'
 
   send_message:
     description: |
       Send a message to a room.
 
       Flow:
-      1️⃣ message_sent (ACK - DB saved)
-      2️⃣ chat_message (broadcast)
-      3️⃣ message_delivered (after recipient confirms)
+      1️ message_sent (ACK - DB saved)
+      2️ chat_message (broadcast)
+      3️ message_delivered (triggered when recipient joins room)
     request:
       $ref: '#/components/schemas/SendMessageRequest'
     responses:
@@ -284,13 +314,6 @@ x-websocket-actions:
         $ref: '#/components/schemas/ChatMessageResponse'
       delivered:
         $ref: '#/components/schemas/MessageDeliveredResponse'
-
-  message_received:
-    description: |
-      Recipient confirms message delivery.
-      This triggers message_delivered event to sender.
-    request:
-      $ref: '#/components/schemas/MessageReceivedRequest'
 
   mark_read:
     description: |
