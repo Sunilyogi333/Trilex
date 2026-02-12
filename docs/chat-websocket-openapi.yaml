@@ -1,4 +1,5 @@
 openapi: 3.0.3
+
 info:
   title: Trilex Chat WebSocket API
   version: 1.0.0
@@ -6,12 +7,14 @@ info:
     WebSocket documentation for Trilex Chat System.
 
     This API uses a single authenticated WebSocket connection.
+    All chat communication happens over a single persistent socket.
 
 servers:
   - url: ws://127.0.0.1:8000
     description: Local Development
-  - url: wss://your-production-domain.com
-    description: Production
+
+  - url: wss://trilex-1.onrender.com
+    description: Production (Render)
 
 paths:
   /ws/socket/:
@@ -20,9 +23,48 @@ paths:
       description: |
         Establish authenticated WebSocket connection.
 
-        Connect using:
+        ----------------------------------------
 
+        ### 🔗 Connection URLs
+
+        Local:
         ws://127.0.0.1:8000/ws/socket/?token=<ACCESS_TOKEN>
+
+        Production:
+        wss://trilex-1.onrender.com/ws/socket/?token=<ACCESS_TOKEN>
+
+        ----------------------------------------
+
+        ### 💻 Frontend JavaScript Example
+
+        ```javascript
+        const socket = new WebSocket(
+          "wss://trilex-1.onrender.com/ws/socket/?token=YOUR_ACCESS_TOKEN"
+        );
+
+        socket.onopen = () => {
+          console.log("Connected");
+
+          // Join a chat room
+          socket.send(JSON.stringify({
+            action: "join_room",
+            room_id: "ROOM_ID"
+          }));
+        };
+
+        socket.onmessage = (event) => {
+          const data = JSON.parse(event.data);
+          console.log("Server:", data);
+        };
+
+        function sendMessage() {
+          socket.send(JSON.stringify({
+            action: "send_message",
+            room_id: "ROOM_ID",
+            message: "Hello"
+          }));
+        }
+        ```
 
       parameters:
         - in: query
@@ -87,15 +129,20 @@ components:
           example: chat_message
         room_id:
           type: string
+          example: 8ba73eaa-414e-45f2-b3a6-b1e5cb77927c
         message:
           type: string
+          example: Hello
         sender:
           type: string
+          example: client@example.com
         message_id:
           type: string
+          example: 91fa12ac-2345-4abc-8de1-abcdef123456
         created_at:
           type: string
           format: date-time
+          example: 2026-02-12T18:52:26.000Z
 
     NewMessageNotification:
       type: object
@@ -105,24 +152,46 @@ components:
           example: new_message_notification
         room_id:
           type: string
+          example: 8ba73eaa-414e-45f2-b3a6-b1e5cb77927c
         message_preview:
           type: string
+          example: Hello
 
 x-websocket-actions:
 
   join_room:
-    description: Join a chat room
+    description: |
+      Join a chat room after WebSocket connection is established.
+
+      Example request:
+      {
+        "action": "join_room",
+        "room_id": "ROOM_ID"
+      }
+
     request:
       $ref: '#/components/schemas/JoinRoomRequest'
+
     response:
       $ref: '#/components/schemas/RoomJoinedResponse'
 
   send_message:
-    description: Send a message to a room
+    description: |
+      Send a message to a specific chat room.
+
+      Example request:
+      {
+        "action": "send_message",
+        "room_id": "ROOM_ID",
+        "message": "Hello"
+      }
+
     request:
       $ref: '#/components/schemas/SendMessageRequest'
+
     responses:
       message_broadcast:
         $ref: '#/components/schemas/ChatMessageResponse'
+
       notification:
         $ref: '#/components/schemas/NewMessageNotification'

@@ -48,12 +48,12 @@ urlpatterns = [
         name="redoc-ui",
     ),
 
-    # 🔥 WebSocket Docs (Separate)
     path(
-        "api/docs/websocket/",
-        websocket_docs_yaml,
-        name="websocket-docs",
+        "api/docs/websocket-ui/",
+        SpectacularSwaggerView.as_view(url_name="websocket-docs"),
+        name="websocket-ui",
     ),
+
 
     # REST APIs
     path("api/auth/", include("accounts.urls")),
