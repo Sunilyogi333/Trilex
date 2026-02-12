@@ -1,7 +1,7 @@
 import json
 from channels.generic.websocket import AsyncWebsocketConsumer
 from channels.db import database_sync_to_async
-from chat.models import ChatParticipant
+from chat.models import ChatParticipant, ChatMessage
 from chat.services.message_service import MessageService
 
 
@@ -59,9 +59,6 @@ class SocketConsumer(AsyncWebsocketConsumer):
         elif action == "send_message":
             await self.handle_send_message(data)
 
-        elif action == "message_received":
-            await self.handle_message_received(data)
-
         elif action == "mark_read":
             await self.handle_mark_read(data)
 
@@ -86,8 +83,40 @@ class SocketConsumer(AsyncWebsocketConsumer):
             self.channel_name
         )
 
+        # 🔥 Deliver ALL pending messages in this room
+        pending_messages = await self.get_undelivered_messages(room_id)
+
+        for msg in pending_messages:
+            await self.channel_layer.group_send(
+                f"user_{msg['sender_id']}",
+                {
+                    "type": "message_delivered",
+                    "room_id": room_id,
+                    "message_id": msg["id"],
+                    "delivered_to": str(self.user.id),
+                }
+            )
+
         await self.send(json.dumps({
             "type": "room_joined",
+            "room_id": room_id
+        }))
+
+    # =========================
+    # LEAVE ROOM
+    # =========================
+    async def leave_room(self, data):
+        room_id = data.get("room_id")
+        if not room_id:
+            return
+
+        await self.channel_layer.group_discard(
+            f"chat_{room_id}",
+            self.channel_name
+        )
+
+        await self.send(json.dumps({
+            "type": "room_left",
             "room_id": room_id
         }))
 
@@ -109,7 +138,7 @@ class SocketConsumer(AsyncWebsocketConsumer):
 
         message = await self.save_message(room_id, message_text)
 
-        # 1️⃣ SENT ACK (DB saved)
+        # 1️⃣ SENT ACK
         await self.send(json.dumps({
             "type": "message_sent",
             "client_temp_id": client_temp_id,
@@ -128,32 +157,6 @@ class SocketConsumer(AsyncWebsocketConsumer):
                 "sender_email": message["sender_email"],
                 "message_id": message["id"],
                 "created_at": message["created_at"],
-            }
-        )
-
-    # =========================
-    # MESSAGE RECEIVED (DELIVERY ACK)
-    # =========================
-    async def handle_message_received(self, data):
-        room_id = data.get("room_id")
-        message_id = data.get("message_id")
-
-        if not room_id or not message_id:
-            return
-
-        message = await self.get_message(message_id)
-
-        if not message:
-            return
-
-        # Notify sender that recipient received message
-        await self.channel_layer.group_send(
-            f"user_{message['sender_id']}",
-            {
-                "type": "message_delivered",
-                "room_id": room_id,
-                "message_id": message_id,
-                "delivered_to": str(self.user.id),
             }
         )
 
@@ -185,14 +188,6 @@ class SocketConsumer(AsyncWebsocketConsumer):
     # =========================
     async def chat_message(self, event):
         await self.send(json.dumps(event))
-
-        # Auto-send delivery confirmation
-        if str(event["sender_id"]) != str(self.user.id):
-            await self.send(json.dumps({
-                "action": "message_received",
-                "room_id": event["room_id"],
-                "message_id": event["message_id"],
-            }))
 
     async def message_delivered(self, event):
         await self.send(json.dumps(event))
@@ -227,17 +222,6 @@ class SocketConsumer(AsyncWebsocketConsumer):
         }
 
     @database_sync_to_async
-    def get_message(self, message_id):
-        from chat.models import ChatMessage
-        try:
-            msg = ChatMessage.objects.get(id=message_id)
-            return {
-                "sender_id": str(msg.sender.id)
-            }
-        except:
-            return None
-
-    @database_sync_to_async
     def get_room_participants(self, room_id):
         return list(
             ChatParticipant.objects.filter(room_id=room_id)
@@ -247,3 +231,21 @@ class SocketConsumer(AsyncWebsocketConsumer):
     @database_sync_to_async
     def mark_room_read(self, room_id):
         MessageService.mark_room_as_read(room_id, self.user)
+
+    @database_sync_to_async
+    def get_undelivered_messages(self, room_id):
+        """
+        Get all messages in this room
+        sent by others and not yet read by this user
+        """
+        messages = ChatMessage.objects.filter(
+            room_id=room_id
+        ).exclude(sender=self.user)
+
+        return [
+            {
+                "id": str(m.id),
+                "sender_id": str(m.sender.id)
+            }
+            for m in messages
+        ]
