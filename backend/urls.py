@@ -49,7 +49,7 @@ urlpatterns = [
     path("api/media/", include("media.urls")),
     path("api/bookings/", include("bookings.urls")),
     path("api/ai-assistant/", include("ai_assistant.urls")),
-    path("api/chat/", include("chat.api.urls")),
+    path("api/chat/", include("chat.urls")),
 ]
 
 urlpatterns += [

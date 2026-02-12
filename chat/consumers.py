@@ -13,6 +13,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
         self.room_id = self.scope["url_route"]["kwargs"]["room_id"]
         self.group_name = f"chat_{self.room_id}"
         self.user = self.scope.get("user")
+        print("User:", self.user)
 
         if not self.user or not self.user.is_authenticated:
             await self.close()
@@ -37,15 +38,25 @@ class ChatConsumer(AsyncWebsocketConsumer):
             self.channel_name
         )
 
-    async def receive(self, text_data):
-        data = json.loads(text_data)
+    async def receive(self, text_data=None, bytes_data=None):
+        if not text_data:
+            return
+    
+        try:
+            data = json.loads(text_data)
+        except json.JSONDecodeError:
+            await self.send(text_data=json.dumps({
+                "error": "Invalid JSON format"
+            }))
+            return
+    
         message_text = data.get("message")
-
+    
         if not message_text:
             return
-
+    
         message = await self.save_message(message_text)
-
+    
         await self.channel_layer.group_send(
             self.group_name,
             {
@@ -56,7 +67,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
                 "created_at": message["created_at"],
             }
         )
-
+    
     async def chat_message(self, event):
         await self.send(text_data=json.dumps(event))
 

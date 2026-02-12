@@ -52,8 +52,7 @@ class MyChatRoomsView(APIView):
         rooms = ChatRoom.objects.filter(
             participants__user=request.user
         ).distinct().prefetch_related(
-            "participants__user",
-            "messages"
+            "participants__user"
         )
 
         paginator = DefaultPageNumberPagination()
