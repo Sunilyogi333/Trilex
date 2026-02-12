@@ -71,9 +71,21 @@ INSTALLED_APPS = [
     "addresses",
     "bookings",
     "ai_assistant",
+    "channels",
+    "chat"
 ]
 
 AUTH_USER_MODEL = "accounts.User"
+ASGI_APPLICATION = "backend.asgi.application"
+
+CHANNEL_LAYERS = {
+    "default": {
+        "BACKEND": "channels_redis.core.RedisChannelLayer",
+        "CONFIG": {
+            "hosts": [os.environ.get("REDIS_URL", "redis://127.0.0.1:6379")],
+        },
+    },
+}
 
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [
