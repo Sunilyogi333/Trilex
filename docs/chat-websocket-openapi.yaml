@@ -2,12 +2,19 @@ openapi: 3.0.3
 
 info:
   title: Trilex Chat WebSocket API
-  version: 1.0.0
+  version: 2.0.0
   description: |
     WebSocket documentation for Trilex Chat System.
 
     This API uses a single authenticated WebSocket connection.
     All chat communication happens over a single persistent socket.
+
+    Architecture:
+    - Frontend sends message with temporary UUID
+    - Server responds with message_sent (ack)
+    - Server broadcasts chat_message
+    - Server sends message_delivered
+    - Server sends message_read
 
 servers:
   - url: ws://127.0.0.1:8000
@@ -35,7 +42,7 @@ paths:
 
         ----------------------------------------
 
-        ### 💻 Frontend JavaScript Example
+        ### 💻 Frontend JavaScript Example (Professional Flow)
 
         ```javascript
         const socket = new WebSocket(
@@ -45,7 +52,7 @@ paths:
         socket.onopen = () => {
           console.log("Connected");
 
-          // Join a chat room
+          // Join room
           socket.send(JSON.stringify({
             action: "join_room",
             room_id: "ROOM_ID"
@@ -55,13 +62,30 @@ paths:
         socket.onmessage = (event) => {
           const data = JSON.parse(event.data);
           console.log("Server:", data);
+
+          switch(data.type) {
+            case "message_sent":
+              console.log("Message saved:", data.message_id);
+              break;
+
+            case "message_delivered":
+              console.log("Delivered ✔✔");
+              break;
+
+            case "message_read":
+              console.log("Read 👁");
+              break;
+          }
         };
 
-        function sendMessage() {
+        function sendMessage(text) {
+          const tempId = crypto.randomUUID();
+
           socket.send(JSON.stringify({
             action: "send_message",
             room_id: "ROOM_ID",
-            message: "Hello"
+            message: text,
+            client_temp_id: tempId
           }));
         }
         ```
@@ -80,6 +104,10 @@ paths:
 
 components:
   schemas:
+
+    # =============================
+    # REQUEST SCHEMAS
+    # =============================
 
     JoinRoomRequest:
       type: object
@@ -100,16 +128,35 @@ components:
         - action
         - room_id
         - message
+        - client_temp_id
       properties:
         action:
           type: string
           example: send_message
         room_id:
           type: string
-          example: 8ba73eaa-414e-45f2-b3a6-b1e5cb77927c
         message:
           type: string
           example: Hello
+        client_temp_id:
+          type: string
+          example: temp-uuid-1234
+
+    MarkReadRequest:
+      type: object
+      required:
+        - action
+        - room_id
+      properties:
+        action:
+          type: string
+          example: mark_read
+        room_id:
+          type: string
+
+    # =============================
+    # RESPONSE SCHEMAS
+    # =============================
 
     RoomJoinedResponse:
       type: object
@@ -119,7 +166,20 @@ components:
           example: room_joined
         room_id:
           type: string
-          example: 8ba73eaa-414e-45f2-b3a6-b1e5cb77927c
+
+    MessageSentResponse:
+      type: object
+      properties:
+        type:
+          type: string
+          example: message_sent
+        client_temp_id:
+          type: string
+        message_id:
+          type: string
+        created_at:
+          type: string
+          format: date-time
 
     ChatMessageResponse:
       type: object
@@ -129,20 +189,37 @@ components:
           example: chat_message
         room_id:
           type: string
-          example: 8ba73eaa-414e-45f2-b3a6-b1e5cb77927c
         message:
           type: string
-          example: Hello
         sender:
           type: string
-          example: client@example.com
         message_id:
           type: string
-          example: 91fa12ac-2345-4abc-8de1-abcdef123456
         created_at:
           type: string
           format: date-time
-          example: 2026-02-12T18:52:26.000Z
+
+    MessageDeliveredResponse:
+      type: object
+      properties:
+        type:
+          type: string
+          example: message_delivered
+        room_id:
+          type: string
+        message_id:
+          type: string
+
+    MessageReadResponse:
+      type: object
+      properties:
+        type:
+          type: string
+          example: message_read
+        room_id:
+          type: string
+        reader_id:
+          type: string
 
     NewMessageNotification:
       type: object
@@ -152,46 +229,46 @@ components:
           example: new_message_notification
         room_id:
           type: string
-          example: 8ba73eaa-414e-45f2-b3a6-b1e5cb77927c
         message_preview:
           type: string
-          example: Hello
+
+# =============================
+# WEBSOCKET ACTIONS
+# =============================
 
 x-websocket-actions:
 
   join_room:
-    description: |
-      Join a chat room after WebSocket connection is established.
-
-      Example request:
-      {
-        "action": "join_room",
-        "room_id": "ROOM_ID"
-      }
-
+    description: Join a chat room.
     request:
       $ref: '#/components/schemas/JoinRoomRequest'
-
     response:
       $ref: '#/components/schemas/RoomJoinedResponse'
 
   send_message:
     description: |
-      Send a message to a specific chat room.
+      Send a message to a room.
 
-      Example request:
-      {
-        "action": "send_message",
-        "room_id": "ROOM_ID",
-        "message": "Hello"
-      }
-
+      Flow:
+      1. message_sent (ack)
+      2. chat_message (broadcast)
+      3. message_delivered
     request:
       $ref: '#/components/schemas/SendMessageRequest'
-
     responses:
-      message_broadcast:
+      message_sent:
+        $ref: '#/components/schemas/MessageSentResponse'
+      chat_broadcast:
         $ref: '#/components/schemas/ChatMessageResponse'
-
+      delivered:
+        $ref: '#/components/schemas/MessageDeliveredResponse'
       notification:
         $ref: '#/components/schemas/NewMessageNotification'
+
+  mark_read:
+    description: Mark all messages in a room as read.
+    request:
+      $ref: '#/components/schemas/MarkReadRequest'
+    responses:
+      read_event:
+        $ref: '#/components/schemas/MessageReadResponse'
