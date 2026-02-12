@@ -17,7 +17,6 @@ class SocketConsumer(AsyncWebsocketConsumer):
             await self.close()
             return
 
-        # Personal group for notifications
         self.user_group = f"user_{self.user.id}"
 
         await self.channel_layer.group_add(
@@ -37,7 +36,7 @@ class SocketConsumer(AsyncWebsocketConsumer):
         )
 
     # =========================
-    # RECEIVE
+    # RECEIVE ROUTER
     # =========================
     async def receive(self, text_data=None, bytes_data=None):
         if not text_data:
@@ -60,6 +59,9 @@ class SocketConsumer(AsyncWebsocketConsumer):
         elif action == "send_message":
             await self.handle_send_message(data)
 
+        elif action == "message_received":
+            await self.handle_message_received(data)
+
         elif action == "mark_read":
             await self.handle_mark_read(data)
 
@@ -79,35 +81,13 @@ class SocketConsumer(AsyncWebsocketConsumer):
             await self.send(json.dumps({"error": "Access denied"}))
             return
 
-        group_name = f"chat_{room_id}"
-
         await self.channel_layer.group_add(
-            group_name,
+            f"chat_{room_id}",
             self.channel_name
         )
 
         await self.send(json.dumps({
             "type": "room_joined",
-            "room_id": room_id
-        }))
-
-    # =========================
-    # LEAVE ROOM
-    # =========================
-    async def leave_room(self, data):
-        room_id = data.get("room_id")
-        if not room_id:
-            return
-
-        group_name = f"chat_{room_id}"
-
-        await self.channel_layer.group_discard(
-            group_name,
-            self.channel_name
-        )
-
-        await self.send(json.dumps({
-            "type": "room_left",
             "room_id": room_id
         }))
 
@@ -129,9 +109,7 @@ class SocketConsumer(AsyncWebsocketConsumer):
 
         message = await self.save_message(room_id, message_text)
 
-        group_name = f"chat_{room_id}"
-
-        # 1️⃣ ACK to sender (message_sent)
+        # 1️⃣ SENT ACK (DB saved)
         await self.send(json.dumps({
             "type": "message_sent",
             "client_temp_id": client_temp_id,
@@ -141,41 +119,43 @@ class SocketConsumer(AsyncWebsocketConsumer):
 
         # 2️⃣ Broadcast to room
         await self.channel_layer.group_send(
-            group_name,
+            f"chat_{room_id}",
             {
                 "type": "chat_message",
                 "room_id": room_id,
                 "message": message["message"],
-                "sender": message["sender"],
+                "sender_id": message["sender_id"],
+                "sender_email": message["sender_email"],
                 "message_id": message["id"],
                 "created_at": message["created_at"],
             }
         )
 
-        # 3️⃣ Send delivered event to sender
-        participants = await self.get_room_participants(room_id)
+    # =========================
+    # MESSAGE RECEIVED (DELIVERY ACK)
+    # =========================
+    async def handle_message_received(self, data):
+        room_id = data.get("room_id")
+        message_id = data.get("message_id")
 
-        for user_id in participants:
-            if str(user_id) != str(self.user.id):
-                await self.channel_layer.group_send(
-                    f"user_{self.user.id}",
-                    {
-                        "type": "message_delivered",
-                        "room_id": room_id,
-                        "message_id": message["id"],
-                    }
-                )
+        if not room_id or not message_id:
+            return
 
-        # 4️⃣ Global inbox notification
-        for user_id in participants:
-            await self.channel_layer.group_send(
-                f"user_{user_id}",
-                {
-                    "type": "new_message_notification",
-                    "room_id": room_id,
-                    "message_preview": message["message"],
-                }
-            )
+        message = await self.get_message(message_id)
+
+        if not message:
+            return
+
+        # Notify sender that recipient received message
+        await self.channel_layer.group_send(
+            f"user_{message['sender_id']}",
+            {
+                "type": "message_delivered",
+                "room_id": room_id,
+                "message_id": message_id,
+                "delivered_to": str(self.user.id),
+            }
+        )
 
     # =========================
     # MARK READ
@@ -190,23 +170,29 @@ class SocketConsumer(AsyncWebsocketConsumer):
         participants = await self.get_room_participants(room_id)
 
         for user_id in participants:
-            await self.channel_layer.group_send(
-                f"user_{user_id}",
-                {
-                    "type": "message_read",
-                    "room_id": room_id,
-                    "reader_id": str(self.user.id),
-                }
-            )
+            if str(user_id) != str(self.user.id):
+                await self.channel_layer.group_send(
+                    f"user_{user_id}",
+                    {
+                        "type": "message_read",
+                        "room_id": room_id,
+                        "reader_id": str(self.user.id),
+                    }
+                )
 
     # =========================
-    # RECEIVE EVENTS
+    # SOCKET EVENT SENDERS
     # =========================
     async def chat_message(self, event):
         await self.send(json.dumps(event))
 
-    async def new_message_notification(self, event):
-        await self.send(json.dumps(event))
+        # Auto-send delivery confirmation
+        if str(event["sender_id"]) != str(self.user.id):
+            await self.send(json.dumps({
+                "action": "message_received",
+                "room_id": event["room_id"],
+                "message_id": event["message_id"],
+            }))
 
     async def message_delivered(self, event):
         await self.send(json.dumps(event))
@@ -235,9 +221,21 @@ class SocketConsumer(AsyncWebsocketConsumer):
         return {
             "id": str(message.id),
             "message": message.message,
-            "sender": message.sender.email,
+            "sender_id": str(message.sender.id),
+            "sender_email": message.sender.email,
             "created_at": message.created_at.isoformat(),
         }
+
+    @database_sync_to_async
+    def get_message(self, message_id):
+        from chat.models import ChatMessage
+        try:
+            msg = ChatMessage.objects.get(id=message_id)
+            return {
+                "sender_id": str(msg.sender.id)
+            }
+        except:
+            return None
 
     @database_sync_to_async
     def get_room_participants(self, room_id):
