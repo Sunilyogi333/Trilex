@@ -107,7 +107,7 @@ SPECTACULAR_SETTINGS = {
     "SERVE_INCLUDE_SCHEMA": False,
     "SERVERS": [
                 {
-            "url": "https://trilex-1.onrender.com",
+            "url": "wss://trilex-1.onrender.com",
             "description": "Production server",
         },
         {

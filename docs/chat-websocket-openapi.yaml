@@ -1,0 +1,128 @@
+openapi: 3.0.3
+info:
+  title: Trilex Chat WebSocket API
+  version: 1.0.0
+  description: |
+    WebSocket documentation for Trilex Chat System.
+
+    This API uses a single authenticated WebSocket connection.
+
+servers:
+  - url: ws://127.0.0.1:8000
+    description: Local Development
+  - url: wss://your-production-domain.com
+    description: Production
+
+paths:
+  /ws/socket/:
+    get:
+      summary: Connect to WebSocket
+      description: |
+        Establish authenticated WebSocket connection.
+
+        Connect using:
+
+        ws://127.0.0.1:8000/ws/socket/?token=<ACCESS_TOKEN>
+
+      parameters:
+        - in: query
+          name: token
+          required: true
+          schema:
+            type: string
+          description: JWT Access Token
+
+      responses:
+        "101":
+          description: Switching Protocols (WebSocket Connected)
+
+components:
+  schemas:
+
+    JoinRoomRequest:
+      type: object
+      required:
+        - action
+        - room_id
+      properties:
+        action:
+          type: string
+          example: join_room
+        room_id:
+          type: string
+          example: 8ba73eaa-414e-45f2-b3a6-b1e5cb77927c
+
+    SendMessageRequest:
+      type: object
+      required:
+        - action
+        - room_id
+        - message
+      properties:
+        action:
+          type: string
+          example: send_message
+        room_id:
+          type: string
+          example: 8ba73eaa-414e-45f2-b3a6-b1e5cb77927c
+        message:
+          type: string
+          example: Hello
+
+    RoomJoinedResponse:
+      type: object
+      properties:
+        type:
+          type: string
+          example: room_joined
+        room_id:
+          type: string
+          example: 8ba73eaa-414e-45f2-b3a6-b1e5cb77927c
+
+    ChatMessageResponse:
+      type: object
+      properties:
+        type:
+          type: string
+          example: chat_message
+        room_id:
+          type: string
+        message:
+          type: string
+        sender:
+          type: string
+        message_id:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+
+    NewMessageNotification:
+      type: object
+      properties:
+        type:
+          type: string
+          example: new_message_notification
+        room_id:
+          type: string
+        message_preview:
+          type: string
+
+x-websocket-actions:
+
+  join_room:
+    description: Join a chat room
+    request:
+      $ref: '#/components/schemas/JoinRoomRequest'
+    response:
+      $ref: '#/components/schemas/RoomJoinedResponse'
+
+  send_message:
+    description: Send a message to a room
+    request:
+      $ref: '#/components/schemas/SendMessageRequest'
+    responses:
+      message_broadcast:
+        $ref: '#/components/schemas/ChatMessageResponse'
+      notification:
+        $ref: '#/components/schemas/NewMessageNotification'

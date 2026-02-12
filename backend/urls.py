@@ -1,45 +1,49 @@
 """
 URL configuration for backend project.
-
-The `urlpatterns` list routes URLs to views. For more information please see:
-    https://docs.djangoproject.com/en/5.2/topics/http/urls/
-Examples:
-Function views
-    1. Add an import:  from my_app import views
-    2. Add a URL to urlpatterns:  path('', views.home, name='home')
-Class-based views
-    1. Add an import:  from other_app.views import Home
-    2. Add a URL to urlpatterns:  path('', Home.as_view(), name='home')
-Including another URLconf
-    1. Import the include() function: from django.urls import include, path
-    2. Add a URL to urlpatterns:  path('blog/', include('blog.urls'))
 """
+
+import os
 from django.conf import settings
 from django.contrib import admin
+from django.http import FileResponse
 from django.urls import path, include
+
 from drf_spectacular.views import (
-    SpectacularAPIView,
     SpectacularSwaggerView,
     SpectacularRedocView,
 )
 
+# Serve Custom WebSocket OpenAPI YAML
+def custom_openapi_yaml(request):
+    file_path = os.path.join(
+        settings.BASE_DIR,
+        "docs",
+        "chat-websocket-openapi.yaml",
+    )
+    return FileResponse(open(file_path, "rb"), content_type="application/yaml")
+
+
 urlpatterns = [
     path("admin/", admin.site.urls),
 
-    path("api/openapi.json", SpectacularAPIView.as_view(), name="openapi-schema"),
+    # 🔥 Custom WebSocket OpenAPI YAML
+    path("api/openapi.yaml", custom_openapi_yaml, name="custom-openapi-yaml"),
 
+    # Swagger UI
     path(
         "api/docs/swagger/",
-        SpectacularSwaggerView.as_view(url_name="openapi-schema"),
+        SpectacularSwaggerView.as_view(url_name="custom-openapi-yaml"),
         name="swagger-ui",
     ),
 
+    # Redoc UI
     path(
         "api/docs/redoc/",
-        SpectacularRedocView.as_view(url_name="openapi-schema"),
+        SpectacularRedocView.as_view(url_name="custom-openapi-yaml"),
         name="redoc-ui",
     ),
 
+    # REST APIs
     path("api/auth/", include("accounts.urls")),
     path("api/clients/", include("clients.urls")),
     path("api/lawyers/", include("lawyers.urls")),

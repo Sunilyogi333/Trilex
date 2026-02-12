@@ -1,21 +1,14 @@
 from urllib.parse import parse_qs
-
-from django.contrib.auth import get_user_model
 from channels.middleware import BaseMiddleware
 from channels.db import database_sync_to_async
-
+from django.contrib.auth import get_user_model
 from rest_framework_simplejwt.authentication import JWTAuthentication
-from rest_framework_simplejwt.exceptions import InvalidToken, TokenError
+from rest_framework_simplejwt.exceptions import InvalidToken
 
 User = get_user_model()
 
 
 class JWTAuthMiddleware(BaseMiddleware):
-    """
-    Authenticates WebSocket connections using SimpleJWT.
-    Expects token in query params:
-    ws://domain/ws/chat/<room_id>/?token=ACCESS_TOKEN
-    """
 
     async def __call__(self, scope, receive, send):
         query_string = scope["query_string"].decode()
@@ -25,13 +18,12 @@ class JWTAuthMiddleware(BaseMiddleware):
 
         if token:
             token = token[0]
-            jwt_auth = JWTAuthentication()
 
             try:
-                validated_token = jwt_auth.get_validated_token(token)
+                validated_token = JWTAuthentication().get_validated_token(token)
                 user = await self.get_user(validated_token["user_id"])
                 scope["user"] = user
-            except (InvalidToken, TokenError):
+            except InvalidToken:
                 scope["user"] = None
         else:
             scope["user"] = None
