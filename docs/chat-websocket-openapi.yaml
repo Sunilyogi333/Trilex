@@ -7,14 +7,19 @@ info:
     WebSocket documentation for Trilex Chat System.
 
     This API uses a single authenticated WebSocket connection.
-    All chat communication happens over a single persistent socket.
+    All chat communication happens over one persistent socket.
 
-    Architecture:
-    - Frontend sends message with temporary UUID
-    - Server responds with message_sent (ack)
-    - Server broadcasts chat_message
-    - Server sends message_delivered
-    - Server sends message_read
+    ------------------------------
+    PROFESSIONAL MESSAGE LIFECYCLE
+    ------------------------------
+
+    1️⃣ Frontend sends message with temporary UUID (client_temp_id)
+    2️⃣ Server saves message and returns message_sent (ACK)
+    3️⃣ Server broadcasts chat_message to room
+    4️⃣ Recipient confirms delivery via message_received
+    5️⃣ Server sends message_delivered to sender
+    6️⃣ Recipient marks room read
+    7️⃣ Server sends message_read event
 
 servers:
   - url: ws://127.0.0.1:8000
@@ -31,8 +36,8 @@ paths:
         Establish authenticated WebSocket connection.
 
         ----------------------------------------
-
-        ### 🔗 Connection URLs
+        🔗 Connection URLs
+        ----------------------------------------
 
         Local:
         ws://127.0.0.1:8000/ws/socket/?token=<ACCESS_TOKEN>
@@ -41,8 +46,8 @@ paths:
         wss://trilex-1.onrender.com/ws/socket/?token=<ACCESS_TOKEN>
 
         ----------------------------------------
-
-        ### 💻 Frontend JavaScript Example (Professional Flow)
+        💻 Frontend Example (Enterprise Flow)
+        ----------------------------------------
 
         ```javascript
         const socket = new WebSocket(
@@ -52,7 +57,6 @@ paths:
         socket.onopen = () => {
           console.log("Connected");
 
-          // Join room
           socket.send(JSON.stringify({
             action: "join_room",
             room_id: "ROOM_ID"
@@ -61,19 +65,29 @@ paths:
 
         socket.onmessage = (event) => {
           const data = JSON.parse(event.data);
-          console.log("Server:", data);
 
           switch(data.type) {
+
             case "message_sent":
-              console.log("Message saved:", data.message_id);
+              // Replace temp message with real ID
+              break;
+
+            case "chat_message":
+              // Show message in UI
+              // Immediately confirm delivery
+              socket.send(JSON.stringify({
+                action: "message_received",
+                room_id: data.room_id,
+                message_id: data.message_id
+              }));
               break;
 
             case "message_delivered":
-              console.log("Delivered ✔✔");
+              // Update ✔✔ status
               break;
 
             case "message_read":
-              console.log("Read 👁");
+              // Update blue ticks
               break;
           }
         };
@@ -142,6 +156,21 @@ components:
           type: string
           example: temp-uuid-1234
 
+    MessageReceivedRequest:
+      type: object
+      required:
+        - action
+        - room_id
+        - message_id
+      properties:
+        action:
+          type: string
+          example: message_received
+        room_id:
+          type: string
+        message_id:
+          type: string
+
     MarkReadRequest:
       type: object
       required:
@@ -191,7 +220,9 @@ components:
           type: string
         message:
           type: string
-        sender:
+        sender_id:
+          type: string
+        sender_email:
           type: string
         message_id:
           type: string
@@ -209,6 +240,8 @@ components:
           type: string
         message_id:
           type: string
+        delivered_to:
+          type: string
 
     MessageReadResponse:
       type: object
@@ -221,17 +254,6 @@ components:
         reader_id:
           type: string
 
-    NewMessageNotification:
-      type: object
-      properties:
-        type:
-          type: string
-          example: new_message_notification
-        room_id:
-          type: string
-        message_preview:
-          type: string
-
 # =============================
 # WEBSOCKET ACTIONS
 # =============================
@@ -239,7 +261,7 @@ components:
 x-websocket-actions:
 
   join_room:
-    description: Join a chat room.
+    description: Join a chat room after WebSocket connection.
     request:
       $ref: '#/components/schemas/JoinRoomRequest'
     response:
@@ -250,9 +272,9 @@ x-websocket-actions:
       Send a message to a room.
 
       Flow:
-      1. message_sent (ack)
-      2. chat_message (broadcast)
-      3. message_delivered
+      1️⃣ message_sent (ACK - DB saved)
+      2️⃣ chat_message (broadcast)
+      3️⃣ message_delivered (after recipient confirms)
     request:
       $ref: '#/components/schemas/SendMessageRequest'
     responses:
@@ -262,11 +284,18 @@ x-websocket-actions:
         $ref: '#/components/schemas/ChatMessageResponse'
       delivered:
         $ref: '#/components/schemas/MessageDeliveredResponse'
-      notification:
-        $ref: '#/components/schemas/NewMessageNotification'
+
+  message_received:
+    description: |
+      Recipient confirms message delivery.
+      This triggers message_delivered event to sender.
+    request:
+      $ref: '#/components/schemas/MessageReceivedRequest'
 
   mark_read:
-    description: Mark all messages in a room as read.
+    description: |
+      Mark all messages in a room as read.
+      Triggers message_read event to other participants.
     request:
       $ref: '#/components/schemas/MarkReadRequest'
     responses:
