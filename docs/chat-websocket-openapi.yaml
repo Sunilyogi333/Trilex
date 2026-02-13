@@ -435,6 +435,8 @@ components:
       description: |
         Sidebar update event.
         Triggered whenever a new message is sent.
+        Structure of last_message matches ChatMessageResponse
+        (without the outer `type` field).
       properties:
         type:
           type: string
@@ -442,12 +444,20 @@ components:
         room_id:
           type: string
         last_message:
-          type: string
-        last_message_at:
-          type: string
-          format: date-time
-        sender:
-          $ref: '#/components/schemas/SenderObject'
+          type: object
+          properties:
+            id:
+              type: string
+            room_id:
+              type: string
+            message:
+              type: string
+            created_at:
+              type: string
+              format: date-time
+            sender:
+              $ref: '#/components/schemas/SenderObject'
+    
 
     MessageDeliveredResponse:
       type: object
