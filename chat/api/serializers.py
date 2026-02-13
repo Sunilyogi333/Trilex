@@ -38,7 +38,7 @@ def resolve_user_display_name(user):
 # ---------------------------------
 
 class ChatParticipantSerializer(serializers.ModelSerializer):
-    user = UserSerializer(read_only=True)
+    user = serializers.SerializerMethodField()
 
     class Meta:
         model = ChatParticipant
@@ -49,6 +49,15 @@ class ChatParticipantSerializer(serializers.ModelSerializer):
             "joined_at",
         )
 
+    def get_user(self, obj):
+        user = obj.user
+
+        return {
+            "id": str(user.id),
+            "email": user.email,
+            "role": user.role,
+            "name": resolve_user_display_name(user),
+        }
 
 # ---------------------------------
 # ROOM LIST SERIALIZER
