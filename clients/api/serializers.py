@@ -177,3 +177,8 @@ class CaseClientProfileSerializer(serializers.ModelSerializer):
             "user",
             "verification",
         )
+
+class ClientDashboardSerializer(serializers.Serializer):
+    accepted_bookings = serializers.IntegerField()
+    active_cases = serializers.IntegerField()
+    verification_status = serializers.CharField()

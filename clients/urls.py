@@ -1,4 +1,5 @@
 from django.urls import path
+from clients.api.dashboard_view import ClientDashboardAPIView
 from clients.api.views import (
     ClientSignupView,
     ClientMeView,
@@ -14,7 +15,9 @@ from clients.api.views import (
 urlpatterns = [
     # signup
     path("signup/", ClientSignupView.as_view()),
-
+    
+    path("dashboard/", ClientDashboardAPIView.as_view(), name="client-dashboard"),
+    
     # self
     path("me/", ClientMeView.as_view()),
     path("me/profile/", ClientProfileUpdateView.as_view()),
