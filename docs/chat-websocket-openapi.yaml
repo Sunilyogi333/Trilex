@@ -2,7 +2,7 @@ openapi: 3.0.3
 
 info:
   title: Trilex Chat WebSocket API
-  version: 2.1.0
+  version: 2.2.0
   description: |
     WebSocket documentation for Trilex Chat System.
 
@@ -16,10 +16,11 @@ info:
     1️ Frontend sends message with temporary UUID (client_temp_id)
     2️ Server saves message and returns message_sent (ACK)
     3️ Server broadcasts chat_message to room
-    4️ When recipient joins the room, server marks the latest message as delivered
-    5️ Server sends message_delivered to sender
-    6️ Recipient marks room read
-    7️ Server sends message_read event
+    4️ Server emits room_updated to all participants (updates sidebar in real-time)
+    5️ When recipient joins the room, server marks the latest message as delivered
+    6️ Server sends message_delivered to sender
+    7️ Recipient marks room read
+    8️ Server sends message_read event
 
     ---------------------------------
     DELIVERY STRATEGY (Optimized)
@@ -30,6 +31,18 @@ info:
     - Only the latest pending message is marked as delivered.
     - Frontend marks earlier messages as delivered automatically.
     - This prevents event flooding and reduces socket traffic.
+
+    ---------------------------------
+    REAL-TIME SIDEBAR STRATEGY
+    ---------------------------------
+
+    - Whenever a new message is sent, server emits "room_updated".
+    - Frontend must:
+        1. Update last_message preview
+        2. Update last_message_at timestamp
+        3. Move the room to the top of the list
+    - No API refresh is required.
+    - Sidebar must always rely on WebSocket events.
 
 servers:
   - url: ws://127.0.0.1:8000
@@ -46,7 +59,7 @@ paths:
         Establish authenticated WebSocket connection.
 
         ----------------------------------------
-        🔗 Connection URLs
+         Connection URLs
         ----------------------------------------
 
         Local:
@@ -56,7 +69,7 @@ paths:
         wss://trilex-1.onrender.com/ws/socket/?token=<ACCESS_TOKEN>
 
         ----------------------------------------
-        💻 Frontend Example (Enterprise Flow)
+         Frontend Example (Enterprise Flow)
         ----------------------------------------
 
         ```javascript
@@ -79,7 +92,6 @@ paths:
           switch(data.type) {
 
             case "room_joined":
-              console.log("Joined room");
               break;
 
             case "message_sent":
@@ -87,7 +99,13 @@ paths:
               break;
 
             case "chat_message":
-              // Render message in UI
+              // Render message in active room
+              break;
+
+            case "room_updated":
+              // Update sidebar:
+              // - update last message preview
+              // - move room to top
               break;
 
             case "message_delivered":
@@ -95,7 +113,7 @@ paths:
               break;
 
             case "message_read":
-              // Show blue tick 👁
+              // Show blue tick 
               break;
           }
         };
@@ -133,10 +151,6 @@ paths:
 
 components:
   schemas:
-
-    # =============================
-    # REQUEST SCHEMAS
-    # =============================
 
     JoinRoomRequest:
       type: object
@@ -178,10 +192,8 @@ components:
           type: string
         message:
           type: string
-          example: Hello
         client_temp_id:
           type: string
-          example: temp-uuid-1234
 
     MarkReadRequest:
       type: object
@@ -194,10 +206,6 @@ components:
           example: mark_read
         room_id:
           type: string
-
-    # =============================
-    # RESPONSE SCHEMAS
-    # =============================
 
     RoomJoinedResponse:
       type: object
@@ -251,6 +259,22 @@ components:
           type: string
           format: date-time
 
+    RoomUpdatedResponse:
+      type: object
+      properties:
+        type:
+          type: string
+          example: room_updated
+        room_id:
+          type: string
+        last_message:
+          type: string
+        last_message_at:
+          type: string
+          format: date-time
+        sender_id:
+          type: string
+
     MessageDeliveredResponse:
       type: object
       properties:
@@ -275,15 +299,11 @@ components:
         reader_id:
           type: string
 
-# =============================
-# WEBSOCKET ACTIONS
-# =============================
-
 x-websocket-actions:
 
   join_room:
     description: |
-      Join a chat room after WebSocket connection.
+      Join a chat room.
       Automatically triggers delivery for latest pending message.
     request:
       $ref: '#/components/schemas/JoinRoomRequest'
@@ -303,8 +323,9 @@ x-websocket-actions:
 
       Flow:
       1️ message_sent (ACK - DB saved)
-      2️ chat_message (broadcast)
-      3️ message_delivered (triggered when recipient joins room)
+      2️ chat_message (broadcast to active room)
+      3️ room_updated (update sidebar for all participants)
+      4️ message_delivered (triggered when recipient joins room)
     request:
       $ref: '#/components/schemas/SendMessageRequest'
     responses:
@@ -312,6 +333,8 @@ x-websocket-actions:
         $ref: '#/components/schemas/MessageSentResponse'
       chat_broadcast:
         $ref: '#/components/schemas/ChatMessageResponse'
+      sidebar_update:
+        $ref: '#/components/schemas/RoomUpdatedResponse'
       delivered:
         $ref: '#/components/schemas/MessageDeliveredResponse'
 

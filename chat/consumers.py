@@ -160,6 +160,21 @@ class SocketConsumer(AsyncWebsocketConsumer):
             }
         )
 
+        # 3️⃣ 🔥 REAL-TIME SIDEBAR UPDATE
+        participants = await self.get_room_participants(room_id)
+
+        for user_id in participants:
+            await self.channel_layer.group_send(
+                f"user_{user_id}",
+                {
+                    "type": "room_updated",
+                    "room_id": room_id,
+                    "last_message": message["message"],
+                    "last_message_at": message["created_at"],
+                    "sender_id": message["sender_id"],
+                }
+            )
+
     # =========================
     # MARK READ
     # =========================
@@ -193,6 +208,9 @@ class SocketConsumer(AsyncWebsocketConsumer):
         await self.send(json.dumps(event))
 
     async def message_read(self, event):
+        await self.send(json.dumps(event))
+
+    async def room_updated(self, event):
         await self.send(json.dumps(event))
 
     # =========================
