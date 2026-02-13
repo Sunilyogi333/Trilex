@@ -83,12 +83,11 @@ class SocketConsumer(AsyncWebsocketConsumer):
             self.channel_name
         )
 
-        # 🔥 Optimized delivery: only latest message
         latest_message = await self.get_latest_message(room_id)
 
-        if latest_message and latest_message["sender_id"] != str(self.user.id):
+        if latest_message and latest_message["sender"]["id"] != str(self.user.id):
             await self.channel_layer.group_send(
-                f"user_{latest_message['sender_id']}",
+                f"user_{latest_message['sender']['id']}",
                 {
                     "type": "message_delivered",
                     "room_id": room_id,
@@ -138,7 +137,7 @@ class SocketConsumer(AsyncWebsocketConsumer):
 
         message = await self.save_message(room_id, message_text)
 
-        # 1️⃣ message_sent (DB ACK)
+        # 1️⃣ message_sent ACK
         await self.send(json.dumps({
             "type": "message_sent",
             "client_temp_id": client_temp_id,
@@ -146,21 +145,16 @@ class SocketConsumer(AsyncWebsocketConsumer):
             "created_at": message["created_at"],
         }))
 
-        # 2️⃣ Broadcast to room
+        # 2️⃣ Broadcast unified message format
         await self.channel_layer.group_send(
             f"chat_{room_id}",
             {
                 "type": "chat_message",
-                "room_id": room_id,
-                "message": message["message"],
-                "sender_id": message["sender_id"],
-                "sender_email": message["sender_email"],
-                "message_id": message["id"],
-                "created_at": message["created_at"],
+                **message
             }
         )
 
-        # 3️⃣ 🔥 REAL-TIME SIDEBAR UPDATE
+        # 3️⃣ Sidebar update
         participants = await self.get_room_participants(room_id)
 
         for user_id in participants:
@@ -171,7 +165,7 @@ class SocketConsumer(AsyncWebsocketConsumer):
                     "room_id": room_id,
                     "last_message": message["message"],
                     "last_message_at": message["created_at"],
-                    "sender_id": message["sender_id"],
+                    "sender": message["sender"],
                 }
             )
 
@@ -202,7 +196,10 @@ class SocketConsumer(AsyncWebsocketConsumer):
     # SOCKET EVENT SENDERS
     # =========================
     async def chat_message(self, event):
-        await self.send(json.dumps(event))
+        await self.send(json.dumps({
+            "type": "chat_message",
+            **event
+        }))
 
     async def message_delivered(self, event):
         await self.send(json.dumps(event))
@@ -231,18 +228,37 @@ class SocketConsumer(AsyncWebsocketConsumer):
             message_text=message_text
         )
 
+        sender_name = self.get_sender_display_name(self.user)
+
         return {
             "id": str(message.id),
+            "room_id": str(room_id),
             "message": message.message,
-            "sender_id": str(message.sender.id),
-            "sender_email": message.sender.email,
             "created_at": message.created_at.isoformat(),
+            "sender": {
+                "id": str(message.sender.id),
+                "name": sender_name,
+                "email": message.sender.email,
+            }
         }
+
+    def get_sender_display_name(self, user):
+        if hasattr(user, "client_verification") and user.client_verification:
+            return user.client_verification.full_name
+
+        if hasattr(user, "bar_verification") and user.bar_verification:
+            return user.bar_verification.full_name
+
+        if hasattr(user, "firm_verification") and user.firm_verification:
+            return user.firm_verification.firm_name
+
+        return user.email
 
     @database_sync_to_async
     def get_latest_message(self, room_id):
         message = (
             ChatMessage.objects
+            .select_related("sender")
             .filter(room_id=room_id)
             .order_by("-created_at")
             .first()
@@ -251,9 +267,18 @@ class SocketConsumer(AsyncWebsocketConsumer):
         if not message:
             return None
 
+        sender_name = self.get_sender_display_name(message.sender)
+
         return {
             "id": str(message.id),
-            "sender_id": str(message.sender.id),
+            "room_id": str(room_id),
+            "message": message.message,
+            "created_at": message.created_at.isoformat(),
+            "sender": {
+                "id": str(message.sender.id),
+                "name": sender_name,
+                "email": message.sender.email,
+            }
         }
 
     @database_sync_to_async

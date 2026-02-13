@@ -15,8 +15,8 @@ info:
 
     1️ Frontend sends message with temporary UUID (client_temp_id)
     2️ Server saves message and returns message_sent (ACK)
-    3️ Server broadcasts chat_message to room
-    4️ Server emits room_updated to all participants (updates sidebar in real-time)
+    3️ Server broadcasts chat_message to room (includes sender_name)
+    4️ Server emits room_updated to all participants (updates sidebar in real-time, includes sender_name)
     5️ When recipient joins the room, server marks the latest message as delivered
     6️ Server sends message_delivered to sender
     7️ Recipient marks room read
@@ -251,8 +251,13 @@ components:
           type: string
         sender_id:
           type: string
-        sender_email:
+        sender_name:
           type: string
+          description: |
+            Human-readable display name of sender.
+            - Client → full_name from ID verification
+            - Lawyer → full_name from bar verification
+            - Firm → firm_name from firm verification
         message_id:
           type: string
         created_at:
@@ -274,76 +279,8 @@ components:
           format: date-time
         sender_id:
           type: string
-
-    MessageDeliveredResponse:
-      type: object
-      properties:
-        type:
+        sender_name:
           type: string
-          example: message_delivered
-        room_id:
-          type: string
-        message_id:
-          type: string
-        delivered_to:
-          type: string
-
-    MessageReadResponse:
-      type: object
-      properties:
-        type:
-          type: string
-          example: message_read
-        room_id:
-          type: string
-        reader_id:
-          type: string
-
-x-websocket-actions:
-
-  join_room:
-    description: |
-      Join a chat room.
-      Automatically triggers delivery for latest pending message.
-    request:
-      $ref: '#/components/schemas/JoinRoomRequest'
-    response:
-      $ref: '#/components/schemas/RoomJoinedResponse'
-
-  leave_room:
-    description: Leave a chat room.
-    request:
-      $ref: '#/components/schemas/LeaveRoomRequest'
-    response:
-      $ref: '#/components/schemas/RoomLeftResponse'
-
-  send_message:
-    description: |
-      Send a message to a room.
-
-      Flow:
-      1️ message_sent (ACK - DB saved)
-      2️ chat_message (broadcast to active room)
-      3️ room_updated (update sidebar for all participants)
-      4️ message_delivered (triggered when recipient joins room)
-    request:
-      $ref: '#/components/schemas/SendMessageRequest'
-    responses:
-      message_sent:
-        $ref: '#/components/schemas/MessageSentResponse'
-      chat_broadcast:
-        $ref: '#/components/schemas/ChatMessageResponse'
-      sidebar_update:
-        $ref: '#/components/schemas/RoomUpdatedResponse'
-      delivered:
-        $ref: '#/components/schemas/MessageDeliveredResponse'
-
-  mark_read:
-    description: |
-      Mark all messages in a room as read.
-      Triggers message_read event to other participants.
-    request:
-      $ref: '#/components/schemas/MarkReadRequest'
-    responses:
-      read_event:
-        $ref: '#/components/schemas/MessageReadResponse'
+          description: |
+            Display name of the user who sent the latest message.
+            Used for real-time sidebar preview.
