@@ -1,4 +1,5 @@
 from django.urls import path
+from lawyers.api.serializers.dashboard_views import LawyerDashboardAPIView
 from lawyers.api.views import (
     LawyerSignupView,
     LawyerMeView,
@@ -16,6 +17,8 @@ from lawyers.api.views import (
 urlpatterns = [
     # SIGNUP
     path("signup/", LawyerSignupView.as_view()),
+
+    path("dashboard/", LawyerDashboardAPIView.as_view(), name="lawyer-dashboard"),
 
     # SELF (ME)
     path("me/", LawyerMeView.as_view()),

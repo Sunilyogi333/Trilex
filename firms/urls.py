@@ -13,10 +13,13 @@ from firms.api.views import (
     FirmSentInvitationsView,
     FirmMembersListView
 )
+from firms.api.views.dashboard_views import FirmDashboardAPIView
 
 urlpatterns = [
     # signup
     path("signup/", FirmSignupView.as_view()),
+
+    path("dashboard/", FirmDashboardAPIView.as_view(), name="firm-dashboard"),
 
     # self
     path("me/", FirmMeView.as_view()),

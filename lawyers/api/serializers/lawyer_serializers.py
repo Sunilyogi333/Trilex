@@ -101,3 +101,11 @@ class LawyerMeSerializer(serializers.Serializer):
     user = LawyerUserSerializer()
     profile = LawyerProfileSerializer()
     verification = BarVerificationMeSerializer(allow_null=True)
+
+class LawyerDashboardSerializer(serializers.Serializer):
+    total_cases = serializers.IntegerField()
+    total_ongoing_cases = serializers.IntegerField()
+    total_pending_bookings = serializers.IntegerField()
+    cases_per_month = serializers.ListField(
+        child=serializers.DictField()
+    )
