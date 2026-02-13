@@ -35,19 +35,20 @@ class NotificationActorSerializer(serializers.Serializer):
     def build_actor(user):
         if not user:
             return None
-
+    
         name = user.email
-
+    
         if hasattr(user, "client_verification") and user.client_verification:
             name = user.client_verification.full_name
         elif hasattr(user, "bar_verification") and user.bar_verification:
             name = user.bar_verification.full_name
         elif hasattr(user, "firm_verification") and user.firm_verification:
             name = user.firm_verification.firm_name
-
+    
         return {
-            "id": user.id,
+            "id": str(user.id),
             "email": user.email,
             "name": name,
             "role": user.role,
         }
+    
