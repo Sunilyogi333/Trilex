@@ -2,48 +2,210 @@ openapi: 3.0.3
 
 info:
   title: Trilex Chat WebSocket API
-  version: 2.3.0
+  version: 2.4.0
   description: |
     WebSocket documentation for Trilex Chat System.
+    
+    ============================================================
+    OVERVIEW
+    ============================================================
+    
+    • Single persistent authenticated WebSocket connection
+    • JWT token must be passed as query parameter
+    • All chat communication happens over this socket
+    • Every server event contains a `type` field
+    
+    Connection format:
+    
+    Local:
+    ws://127.0.0.1:8000/ws/socket/?token=<ACCESS_TOKEN>
+    
+    Production:
+    wss://trilex-1.onrender.com/ws/socket/?token=<ACCESS_TOKEN>
+    
+    
+    ============================================================
+    SOCKET CONNECTION FLOW (Frontend Implementation Guide)
+    ============================================================
+    
+    STEP 1 — CONNECT
+    ----------------
+    Frontend opens WebSocket connection.
+    User is automatically added to personal group:
+        user_<user_id>
+    
+    No room is joined automatically.
+    
+    ------------------------------------------------------------
+    
+    STEP 2 — JOIN ROOM
+    ------------------
+    Frontend sends:
+    
+    {
+      "action": "join_room",
+      "room_id": "<ROOM_ID>"
+    }
+    
+    Server responds:
+    
+    Event: room_joined
+    Schema: RoomJoinedResponse
+    
+    If there is a latest pending message from another user,
+    server also triggers:
+    
+    Event: message_delivered
+    Schema: MessageDeliveredResponse
+    (Sent ONLY to original sender)
+    
+    ------------------------------------------------------------
+    
+    STEP 3 — SEND MESSAGE
+    ---------------------
+    
+    Frontend sends:
+    
+    {
+      "action": "send_message",
+      "room_id": "<ROOM_ID>",
+      "message": "Hello",
+      "client_temp_id": "<UUID>"
+    }
+    
+    Server emits events in this order:
+    
+    1) message_sent  
+       → Sent ONLY to sender  
+       → Schema: MessageSentResponse  
+       → Purpose: ACK that DB saved message  
+    
+    2) chat_message  
+       → Sent to ALL participants in room  
+       → Schema: ChatMessageResponse  
+       → Purpose: Real message delivery  
+    
+    3) room_updated  
+       → Sent to ALL participants (user-level group)  
+       → Schema: RoomUpdatedResponse  
+       → Purpose: Sidebar update (preview + reorder room)
+    
+    ------------------------------------------------------------
+    
+    STEP 4 — RECEIVE MESSAGE
+    ------------------------
+    
+    Frontend must listen for:
+    
+    Event: chat_message  
+    Schema: ChatMessageResponse  
+    
+    This is the main event for receiving new messages.
+    
+    ------------------------------------------------------------
+    
+    STEP 5 — DELIVERY LOGIC
+    -----------------------
+    
+    Delivery is NOT triggered per message manually.
+    
+    Delivery is automatically triggered when:
+        A participant joins the room.
+    
+    Only the LATEST pending message is marked delivered.
+    
+    Event sent:
+    message_delivered
+    Schema: MessageDeliveredResponse
+    Sent ONLY to original sender.
+    
+    Frontend should:
+    • Mark latest message as delivered
+    • Optionally mark older messages visually delivered
+    
+    This prevents WebSocket flooding.
+    
+    ------------------------------------------------------------
+    
+    STEP 6 — MARK READ
+    ------------------
+    
+    Frontend sends:
+    
+    {
+      "action": "mark_read",
+      "room_id": "<ROOM_ID>"
+    }
+    
+    Server sends to OTHER participants:
+    
+    Event: message_read
+    Schema: MessageReadResponse
+    
+    Purpose:
+    Indicates that a participant has read messages in this room.
+    
+    ============================================================
+    EVENT LISTENER REFERENCE (Frontend Must Handle These)
+    ============================================================
+    
+    room_joined       → RoomJoinedResponse  
+    room_left         → RoomLeftResponse  
+    message_sent      → MessageSentResponse  
+    chat_message      → ChatMessageResponse   (MAIN MESSAGE EVENT)  
+    room_updated      → RoomUpdatedResponse   (SIDEBAR EVENT)  
+    message_delivered → MessageDeliveredResponse  
+    message_read      → MessageReadResponse  
+    
+    ============================================================
+    WEBSOCKET ACTIONS (What Frontend Can Send)
+    ============================================================
+    
+    Action: join_room
+    Purpose: Join a chat room
+    Request Schema: JoinRoomRequest
+    
+    Action: leave_room
+    Purpose: Leave room and stop receiving messages
+    Request Schema: LeaveRoomRequest
+    
+    Action: send_message
+    Purpose: Send new message
+    Request Schema: SendMessageRequest
+    
+    Action: mark_read
+    Purpose: Mark all messages in room as read
+    Request Schema: MarkReadRequest
+    
+    ============================================================
+    UNIFIED MESSAGE FORMAT
+    ============================================================
+    
+    All message-related events use this sender structure:
+    
+    sender: {
+      "id": string,
+      "name": string,
+      "email": string
+    }
+    
+    Used in:
+    • ChatMessageResponse
+    • RoomUpdatedResponse
+    
+    ============================================================
+    IMPORTANT DESIGN NOTES
+    ============================================================
+    
+    • chat_message is the event to RECEIVE messages
+    • send_message is the action to SEND messages
+    • message_sent is only an ACK for sender
+    • message_delivered triggers on room join
+    • message_read triggers after mark_read
+    • room_updated is ONLY for sidebar updates
+    • API endpoints are used for pagination and history
+    • WebSocket is used for real-time updates only
 
-    This API uses a single authenticated WebSocket connection.
-    All chat communication happens over one persistent socket.
-
-    ------------------------------
-    PROFESSIONAL MESSAGE LIFECYCLE
-    ------------------------------
-
-    1️ Frontend sends message with temporary UUID (client_temp_id)
-    2️ Server saves message and returns message_sent (ACK)
-    3️ Server broadcasts chat_message to room
-       (Includes unified sender object)
-    4️ Server emits room_updated to all participants
-       (Real-time sidebar update)
-    5️ When recipient joins the room, server marks the latest message as delivered
-    6️ Server sends message_delivered to sender
-    7️ Recipient marks room read
-    8️ Server sends message_read event
-
-    ---------------------------------
-    DELIVERY STRATEGY (Optimized)
-    ---------------------------------
-
-    - Delivery is NOT triggered per message.
-    - Delivery happens automatically when recipient joins room.
-    - Only the latest pending message is marked as delivered.
-    - Frontend auto-marks previous messages as delivered.
-    - Prevents socket flooding.
-
-    ---------------------------------
-    REAL-TIME SIDEBAR STRATEGY
-    ---------------------------------
-
-    - On every new message, server emits "room_updated".
-    - Frontend must:
-        1. Update last message preview
-        2. Update last message timestamp
-        3. Move room to top of list
-    - No REST refresh required.
 
 servers:
   - url: ws://127.0.0.1:8000
@@ -59,32 +221,20 @@ paths:
       description: |
         Establish authenticated WebSocket connection.
 
-        ----------------------------------------
-        Connection URLs
-        ----------------------------------------
-
-        Local:
-        ws://127.0.0.1:8000/ws/socket/?token=<ACCESS_TOKEN>
-
-        Production:
+        Connection URL Format:
         wss://trilex-1.onrender.com/ws/socket/?token=<ACCESS_TOKEN>
 
-        ----------------------------------------
-        Frontend Example
-        ----------------------------------------
+        ============================================================
+        FRONTEND IMPLEMENTATION TEMPLATE
+        ============================================================
 
         ```javascript
         const socket = new WebSocket(
-          "wss://trilex-1.onrender.com/ws/socket/?token=YOUR_ACCESS_TOKEN"
+          "wss://trilex-1.onrender.com/ws/socket/?token=ACCESS_TOKEN"
         );
 
         socket.onopen = () => {
           console.log("Connected");
-
-          socket.send(JSON.stringify({
-            action: "join_room",
-            room_id: "ROOM_ID"
-          }));
         };
 
         socket.onmessage = (event) => {
@@ -93,28 +243,27 @@ paths:
           switch(data.type) {
 
             case "room_joined":
+              // RoomJoinedResponse
               break;
 
             case "message_sent":
-              // Replace temp message with real ID
+              // MessageSentResponse (ACK)
               break;
 
             case "chat_message":
-              // Render message in active room
+              // ChatMessageResponse (RECEIVE MESSAGE HERE)
               break;
 
             case "room_updated":
-              // Update sidebar:
-              // - update last_message
-              // - move room to top
+              // RoomUpdatedResponse (Update sidebar)
               break;
 
             case "message_delivered":
-              // Show ✔✔
+              // MessageDeliveredResponse (Show ✔✔)
               break;
 
             case "message_read":
-              // Show blue tick
+              // MessageReadResponse (Show blue ticks)
               break;
           }
         };
@@ -153,12 +302,13 @@ paths:
 components:
   schemas:
 
-    # =============================
+    # ============================================================
     # REQUEST SCHEMAS
-    # =============================
+    # ============================================================
 
     JoinRoomRequest:
       type: object
+      description: Sent by frontend to join a room.
       required: [action, room_id]
       properties:
         action:
@@ -169,6 +319,7 @@ components:
 
     LeaveRoomRequest:
       type: object
+      description: Leave a room and stop receiving its messages.
       required: [action, room_id]
       properties:
         action:
@@ -179,6 +330,7 @@ components:
 
     SendMessageRequest:
       type: object
+      description: Send a new chat message.
       required: [action, room_id, message, client_temp_id]
       properties:
         action:
@@ -190,9 +342,11 @@ components:
           type: string
         client_temp_id:
           type: string
+          description: Temporary ID used by frontend before DB ACK.
 
     MarkReadRequest:
       type: object
+      description: Mark all messages in a room as read.
       required: [action, room_id]
       properties:
         action:
@@ -201,12 +355,28 @@ components:
         room_id:
           type: string
 
-    # =============================
+    # ============================================================
+    # COMMON OBJECTS
+    # ============================================================
+
+    SenderObject:
+      type: object
+      description: Unified sender structure used in all message events.
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        email:
+          type: string
+
+    # ============================================================
     # RESPONSE SCHEMAS
-    # =============================
+    # ============================================================
 
     RoomJoinedResponse:
       type: object
+      description: Confirmation that user successfully joined room.
       properties:
         type:
           type: string
@@ -216,6 +386,7 @@ components:
 
     RoomLeftResponse:
       type: object
+      description: Confirmation that user left room.
       properties:
         type:
           type: string
@@ -225,6 +396,7 @@ components:
 
     MessageSentResponse:
       type: object
+      description: ACK response to sender confirming DB save.
       properties:
         type:
           type: string
@@ -239,13 +411,15 @@ components:
 
     ChatMessageResponse:
       type: object
+      description: |
+        Primary event for receiving chat messages.
+        All participants in the room receive this event.
       properties:
         type:
           type: string
           example: chat_message
         id:
           type: string
-          description: Message ID
         room_id:
           type: string
         message:
@@ -254,22 +428,13 @@ components:
           type: string
           format: date-time
         sender:
-          type: object
-          properties:
-            id:
-              type: string
-            name:
-              type: string
-              description: |
-                Human-readable display name.
-                - Client → IDVerification.full_name
-                - Lawyer → BarVerification.full_name
-                - Firm → FirmVerification.firm_name
-            email:
-              type: string
+          $ref: '#/components/schemas/SenderObject'
 
     RoomUpdatedResponse:
       type: object
+      description: |
+        Sidebar update event.
+        Triggered whenever a new message is sent.
       properties:
         type:
           type: string
@@ -282,17 +447,13 @@ components:
           type: string
           format: date-time
         sender:
-          type: object
-          properties:
-            id:
-              type: string
-            name:
-              type: string
-            email:
-              type: string
+          $ref: '#/components/schemas/SenderObject'
 
     MessageDeliveredResponse:
       type: object
+      description: |
+        Triggered when recipient joins room.
+        Sent only to original sender.
       properties:
         type:
           type: string
@@ -306,6 +467,9 @@ components:
 
     MessageReadResponse:
       type: object
+      description: |
+        Triggered when a participant marks room as read.
+        Sent to other participants.
       properties:
         type:
           type: string
@@ -314,56 +478,3 @@ components:
           type: string
         reader_id:
           type: string
-
-# =============================
-# WEBSOCKET ACTIONS
-# =============================
-
-x-websocket-actions:
-
-  join_room:
-    description: |
-      Join a chat room.
-      Automatically triggers delivery for latest pending message.
-    request:
-      $ref: '#/components/schemas/JoinRoomRequest'
-    response:
-      $ref: '#/components/schemas/RoomJoinedResponse'
-
-  leave_room:
-    description: Leave a chat room.
-    request:
-      $ref: '#/components/schemas/LeaveRoomRequest'
-    response:
-      $ref: '#/components/schemas/RoomLeftResponse'
-
-  send_message:
-    description: |
-      Send a message to a room.
-
-      Flow:
-      1️ message_sent (ACK)
-      2️ chat_message (room broadcast)
-      3️ room_updated (sidebar update)
-      4️ message_delivered (when recipient joins)
-    request:
-      $ref: '#/components/schemas/SendMessageRequest'
-    responses:
-      message_sent:
-        $ref: '#/components/schemas/MessageSentResponse'
-      chat_broadcast:
-        $ref: '#/components/schemas/ChatMessageResponse'
-      sidebar_update:
-        $ref: '#/components/schemas/RoomUpdatedResponse'
-      delivered:
-        $ref: '#/components/schemas/MessageDeliveredResponse'
-
-  mark_read:
-    description: |
-      Mark all messages in a room as read.
-      Triggers message_read event to other participants.
-    request:
-      $ref: '#/components/schemas/MarkReadRequest'
-    responses:
-      read_event:
-        $ref: '#/components/schemas/MessageReadResponse'

@@ -137,7 +137,7 @@ class SocketConsumer(AsyncWebsocketConsumer):
 
         message = await self.save_message(room_id, message_text)
 
-        # 1️⃣ message_sent ACK
+        # message_sent ACK (only to sender)
         await self.send(json.dumps({
             "type": "message_sent",
             "client_temp_id": client_temp_id,
@@ -145,7 +145,7 @@ class SocketConsumer(AsyncWebsocketConsumer):
             "created_at": message["created_at"],
         }))
 
-        # 2️⃣ Broadcast unified message format
+        # Broadcast chat_message to room
         await self.channel_layer.group_send(
             f"chat_{room_id}",
             {
@@ -154,7 +154,7 @@ class SocketConsumer(AsyncWebsocketConsumer):
             }
         )
 
-        # 3️⃣ Sidebar update
+        # Sidebar update — NOW MATCHES API STRUCTURE
         participants = await self.get_room_participants(room_id)
 
         for user_id in participants:
@@ -163,9 +163,7 @@ class SocketConsumer(AsyncWebsocketConsumer):
                 {
                     "type": "room_updated",
                     "room_id": room_id,
-                    "last_message": message["message"],
-                    "last_message_at": message["created_at"],
-                    "sender": message["sender"],
+                    "last_message": message,  # full unified message object
                 }
             )
 
