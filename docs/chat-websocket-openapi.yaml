@@ -35,6 +35,13 @@ info:
         user_<user_id>
     
     No room is joined automatically.
+
+    Immediately after connection server sends:
+
+    Event: unread_count
+    Schema: UnreadCountResponse
+    
+    Used to initialize notification badge.
     
     ------------------------------------------------------------
     
@@ -144,7 +151,65 @@ info:
     
     Purpose:
     Indicates that a participant has read messages in this room.
-    
+
+    ============================================================
+    NOTIFICATION SYSTEM (REAL-TIME)
+    ============================================================
+
+    OVERVIEW
+    --------
+    • Notifications are user-level events (not room-based)
+    • Sent via personal group: user_<user_id>
+    • Persisted in database
+    • Delivered in real-time via WebSocket
+    • Unread counter is pushed automatically
+
+    Notifications are triggered by:
+    • Booking events (created, accepted, rejected)
+    • Firm invitation events (received, accepted, rejected)
+
+    ------------------------------------------------------------
+
+    WHEN NEW NOTIFICATION IS CREATED
+    ---------------------------------
+    Server sends TWO events in order:
+
+    1) notification
+       → Schema: NotificationResponse
+       → Contains full notification payload
+
+    2) unread_count
+       → Schema: UnreadCountResponse
+       → Updated unread count
+
+    ------------------------------------------------------------
+
+    MARK AS READ (REST API)
+    -----------------------
+    When notification is marked read via REST:
+
+    POST /notifications/<id>/read/
+    OR
+    POST /notifications/mark-all-read/
+
+    Server automatically pushes:
+
+    Event: unread_count
+    Schema: UnreadCountResponse
+
+    ------------------------------------------------------------
+
+    NOTIFICATION EVENT TYPES
+    ------------------------
+
+    booking_created
+    booking_accepted
+    booking_rejected
+
+    firm_invitation_received
+    firm_invitation_accepted
+    firm_invitation_rejected
+
     ============================================================
     EVENT LISTENER REFERENCE (Frontend Must Handle These)
     ============================================================
@@ -152,47 +217,39 @@ info:
     room_joined       → RoomJoinedResponse  
     room_left         → RoomLeftResponse  
     message_sent      → MessageSentResponse  
-    chat_message      → ChatMessageResponse   (MAIN MESSAGE EVENT)  
-    room_updated      → RoomUpdatedResponse   (SIDEBAR EVENT)  
+    chat_message      → ChatMessageResponse  
+    room_updated      → RoomUpdatedResponse  
     message_delivered → MessageDeliveredResponse  
     message_read      → MessageReadResponse  
+    notification      → NotificationResponse  
+    unread_count      → UnreadCountResponse  
     
     ============================================================
     WEBSOCKET ACTIONS (What Frontend Can Send)
     ============================================================
     
     Action: join_room
-    Purpose: Join a chat room
     Request Schema: JoinRoomRequest
     
     Action: leave_room
-    Purpose: Leave room and stop receiving messages
     Request Schema: LeaveRoomRequest
     
     Action: send_message
-    Purpose: Send new message
     Request Schema: SendMessageRequest
     
     Action: mark_read
-    Purpose: Mark all messages in room as read
     Request Schema: MarkReadRequest
     
     ============================================================
     UNIFIED MESSAGE FORMAT
     ============================================================
     
-    All message-related events use this sender structure:
-    
     sender: {
       "id": string,
       "name": string,
       "email": string
     }
-    
-    Used in:
-    • ChatMessageResponse
-    • RoomUpdatedResponse
-    
+
     ============================================================
     IMPORTANT DESIGN NOTES
     ============================================================
@@ -203,6 +260,8 @@ info:
     • message_delivered triggers on room join
     • message_read triggers after mark_read
     • room_updated is ONLY for sidebar updates
+    • notification is a user-level event
+    • unread_count updates notification badge
     • API endpoints are used for pagination and history
     • WebSocket is used for real-time updates only
 
@@ -221,21 +280,10 @@ paths:
       description: |
         Establish authenticated WebSocket connection.
 
-        Connection URL Format:
-        wss://trilex-1.onrender.com/ws/socket/?token=<ACCESS_TOKEN>
-
-        ============================================================
-        FRONTEND IMPLEMENTATION TEMPLATE
-        ============================================================
-
         ```javascript
         const socket = new WebSocket(
           "wss://trilex-1.onrender.com/ws/socket/?token=ACCESS_TOKEN"
         );
-
-        socket.onopen = () => {
-          console.log("Connected");
-        };
 
         socket.onmessage = (event) => {
           const data = JSON.parse(event.data);
@@ -243,48 +291,32 @@ paths:
           switch(data.type) {
 
             case "room_joined":
-              // RoomJoinedResponse
               break;
 
             case "message_sent":
-              // MessageSentResponse (ACK)
               break;
 
             case "chat_message":
-              // ChatMessageResponse (RECEIVE MESSAGE HERE)
               break;
 
             case "room_updated":
-              // RoomUpdatedResponse (Update sidebar)
               break;
 
             case "message_delivered":
-              // MessageDeliveredResponse (Show ✔✔)
               break;
 
             case "message_read":
-              // MessageReadResponse (Show blue ticks)
+              break;
+
+            case "notification":
+              // Add to notification list
+              break;
+
+            case "unread_count":
+              // Update badge counter
               break;
           }
         };
-
-        function sendMessage(text) {
-          const tempId = crypto.randomUUID();
-
-          socket.send(JSON.stringify({
-            action: "send_message",
-            room_id: "ROOM_ID",
-            message: text,
-            client_temp_id: tempId
-          }));
-        }
-
-        function markRoomRead(roomId) {
-          socket.send(JSON.stringify({
-            action: "mark_read",
-            room_id: roomId
-          }));
-        }
         ```
 
       parameters:
@@ -302,66 +334,8 @@ paths:
 components:
   schemas:
 
-    # ============================================================
-    # REQUEST SCHEMAS
-    # ============================================================
-
-    JoinRoomRequest:
-      type: object
-      description: Sent by frontend to join a room.
-      required: [action, room_id]
-      properties:
-        action:
-          type: string
-          example: join_room
-        room_id:
-          type: string
-
-    LeaveRoomRequest:
-      type: object
-      description: Leave a room and stop receiving its messages.
-      required: [action, room_id]
-      properties:
-        action:
-          type: string
-          example: leave_room
-        room_id:
-          type: string
-
-    SendMessageRequest:
-      type: object
-      description: Send a new chat message.
-      required: [action, room_id, message, client_temp_id]
-      properties:
-        action:
-          type: string
-          example: send_message
-        room_id:
-          type: string
-        message:
-          type: string
-        client_temp_id:
-          type: string
-          description: Temporary ID used by frontend before DB ACK.
-
-    MarkReadRequest:
-      type: object
-      description: Mark all messages in a room as read.
-      required: [action, room_id]
-      properties:
-        action:
-          type: string
-          example: mark_read
-        room_id:
-          type: string
-
-    # ============================================================
-    # COMMON OBJECTS
-    # ============================================================
-
     SenderObject:
       type: object
-      description: Unified sender structure used in all message events.
       properties:
         id:
           type: string
@@ -370,121 +344,54 @@ components:
         email:
           type: string
 
-    # ============================================================
-    # RESPONSE SCHEMAS
-    # ============================================================
-
-    RoomJoinedResponse:
+    NotificationActorObject:
       type: object
-      description: Confirmation that user successfully joined room.
       properties:
-        type:
-          type: string
-          example: room_joined
-        room_id:
-          type: string
-
-    RoomLeftResponse:
-      type: object
-      description: Confirmation that user left room.
-      properties:
-        type:
-          type: string
-          example: room_left
-        room_id:
-          type: string
-
-    MessageSentResponse:
-      type: object
-      description: ACK response to sender confirming DB save.
-      properties:
-        type:
-          type: string
-          example: message_sent
-        client_temp_id:
-          type: string
-        message_id:
-          type: string
-        created_at:
-          type: string
-          format: date-time
-
-    ChatMessageResponse:
-      type: object
-      description: |
-        Primary event for receiving chat messages.
-        All participants in the room receive this event.
-      properties:
-        type:
-          type: string
-          example: chat_message
         id:
           type: string
-        room_id:
+        email:
           type: string
-        message:
+        name:
           type: string
-        created_at:
+        role:
           type: string
-          format: date-time
-        sender:
-          $ref: '#/components/schemas/SenderObject'
 
-    RoomUpdatedResponse:
+    NotificationResponse:
       type: object
-      description: |
-        Sidebar update event.
-        Triggered whenever a new message is sent.
-        Structure of last_message matches ChatMessageResponse
-        (without the outer `type` field).
       properties:
         type:
           type: string
-          example: room_updated
-        room_id:
-          type: string
-        last_message:
+          example: notification
+        notification:
           type: object
           properties:
             id:
               type: string
-            room_id:
+            type:
+              type: string
+            title:
               type: string
             message:
               type: string
+            entity_type:
+              type: string
+            entity_id:
+              type: string
+            metadata:
+              type: object
+            is_read:
+              type: boolean
             created_at:
               type: string
               format: date-time
-            sender:
-              $ref: '#/components/schemas/SenderObject'
-    
+            actor:
+              $ref: '#/components/schemas/NotificationActorObject'
 
-    MessageDeliveredResponse:
+    UnreadCountResponse:
       type: object
-      description: |
-        Triggered when recipient joins room.
-        Sent only to original sender.
       properties:
         type:
           type: string
-          example: message_delivered
-        room_id:
-          type: string
-        message_id:
-          type: string
-        delivered_to:
-          type: string
-
-    MessageReadResponse:
-      type: object
-      description: |
-        Triggered when a participant marks room as read.
-        Sent to other participants.
-      properties:
-        type:
-          type: string
-          example: message_read
-        room_id:
-          type: string
-        reader_id:
-          type: string
+          example: unread_count
+        count:
+          type: integer

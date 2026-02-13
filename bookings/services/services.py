@@ -9,12 +9,13 @@ from base.constants.booking_status import BookingStatus
 from base.constants.user_roles import UserRoles
 from base.constants.verification import VerificationStatus
 
+from notifications.services import NotificationService
+from notifications.constants import NotificationType
+
 
 class BookingService:
 
-    # -------------------------
     # INTERNAL
-    # -------------------------
     @staticmethod
     def ensure_verified(user):
         if user.role == UserRoles.CLIENT:
@@ -29,12 +30,11 @@ class BookingService:
         if not verification or verification.status != VerificationStatus.VERIFIED:
             raise APIException("User must be verified.")
 
-    # -------------------------
     # CREATE
-    # -------------------------
     @staticmethod
     @transaction.atomic
     def create_booking(*, created_by, created_to, **data):
+
         if created_by.role != UserRoles.CLIENT:
             raise PermissionDenied("Only clients can create bookings.")
 
@@ -56,18 +56,34 @@ class BookingService:
                 "You already have a pending booking with this user."
             )
 
-        return Booking.objects.create(
+        booking = Booking.objects.create(
             created_by=created_by,
             created_to=created_to,
             **data,
         )
 
-    # -------------------------
+        # Send notification AFTER commit
+        transaction.on_commit(lambda: NotificationService.create_notification(
+            recipient=created_to,
+            notification_type=NotificationType.BOOKING_CREATED,
+            title="New Booking Request",
+            message=f"You have received a new booking request.",
+            entity_type="booking",
+            entity_id=booking.id,
+            content_object=booking,
+            metadata={
+                "booking_id": str(booking.id),
+            },
+            actor=created_by,
+        ))
+
+        return booking
+
     # ACCEPT
-    # -------------------------
     @staticmethod
     @transaction.atomic
     def accept_booking(*, booking, user):
+
         if booking.created_to != user:
             raise PermissionDenied("You cannot accept this booking.")
 
@@ -78,14 +94,29 @@ class BookingService:
 
         booking.status = BookingStatus.ACCEPTED
         booking.save(update_fields=["status", "updated_at"])
+
+        # Notify client
+        transaction.on_commit(lambda: NotificationService.create_notification(
+            recipient=booking.created_by,
+            notification_type=NotificationType.BOOKING_ACCEPTED,
+            title="Booking Accepted",
+            message="Your booking request has been accepted.",
+            entity_type="booking",
+            entity_id=booking.id,
+            content_object=booking,
+            metadata={
+                "booking_id": str(booking.id),
+            },
+            actor=user,
+        ))
+
         return booking
 
-    # -------------------------
     # REJECT
-    # -------------------------
     @staticmethod
     @transaction.atomic
     def reject_booking(*, booking, user):
+
         if booking.created_to != user:
             raise PermissionDenied("You cannot reject this booking.")
 
@@ -96,4 +127,20 @@ class BookingService:
 
         booking.status = BookingStatus.REJECTED
         booking.save(update_fields=["status", "updated_at"])
+
+        # Notify client
+        transaction.on_commit(lambda: NotificationService.create_notification(
+            recipient=booking.created_by,
+            notification_type=NotificationType.BOOKING_REJECTED,
+            title="Booking Rejected",
+            message="Your booking request has been rejected.",
+            entity_type="booking",
+            entity_id=booking.id,
+            content_object=booking,
+            metadata={
+                "booking_id": str(booking.id),
+            },
+            actor=user,
+        ))
+
         return booking

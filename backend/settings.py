@@ -72,6 +72,7 @@ INSTALLED_APPS = [
     "bookings",
     "ai_assistant",
     "channels",
+    "notifications",
     "chat"
 ]
 

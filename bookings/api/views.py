@@ -22,6 +22,7 @@ from base.constants.booking_status import BookingStatus
 from base.pagination import DefaultPageNumberPagination
 from rest_framework.exceptions import APIException
 
+
 # -------------------------
 # CREATE BOOKING (CLIENT)
 # -------------------------

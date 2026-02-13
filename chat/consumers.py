@@ -32,6 +32,8 @@ class SocketConsumer(AsyncWebsocketConsumer):
         )
 
         await self.accept()
+        await self.push_unread_count()
+
 
     # =========================
     # DISCONNECT
@@ -183,7 +185,7 @@ class SocketConsumer(AsyncWebsocketConsumer):
         for user_id in participants:
             user_id_str = str(user_id)
 
-            # ✅ Only trigger delivered if recipient is online
+            # Only trigger delivered if recipient is online
             if user_id_str != str(self.user.id) and user_id_str in ONLINE_USERS:
                 await self.channel_layer.group_send(
                     f"user_{self.user.id}",  # notify sender
@@ -218,6 +220,26 @@ class SocketConsumer(AsyncWebsocketConsumer):
                     }
                 )
 
+    async def push_unread_count(self):
+        from notifications.models import Notification
+        from asgiref.sync import sync_to_async
+    
+        count = await sync_to_async(
+            lambda: Notification.objects.filter(
+                recipient=self.user,
+                is_read=False
+            ).count()
+        )()
+    
+        await self.send(json.dumps({
+            "type": "unread_count",
+            "count": count
+        }))
+
+    async def unread_count(self, event):
+        await self.send(json.dumps(event))
+    
+
     # =========================
     # SOCKET EVENT SENDERS
     # =========================
@@ -234,6 +256,9 @@ class SocketConsumer(AsyncWebsocketConsumer):
         await self.send(json.dumps(event))
 
     async def room_updated(self, event):
+        await self.send(json.dumps(event))
+
+    async def notification(self, event):
         await self.send(json.dumps(event))
 
     # =========================
