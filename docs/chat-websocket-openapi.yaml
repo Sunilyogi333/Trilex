@@ -2,7 +2,7 @@ openapi: 3.0.3
 
 info:
   title: Trilex Chat WebSocket API
-  version: 2.2.0
+  version: 2.3.0
   description: |
     WebSocket documentation for Trilex Chat System.
 
@@ -15,8 +15,10 @@ info:
 
     1️ Frontend sends message with temporary UUID (client_temp_id)
     2️ Server saves message and returns message_sent (ACK)
-    3️ Server broadcasts chat_message to room (includes sender_name)
-    4️ Server emits room_updated to all participants (updates sidebar in real-time, includes sender_name)
+    3️ Server broadcasts chat_message to room
+       (Includes unified sender object)
+    4️ Server emits room_updated to all participants
+       (Real-time sidebar update)
     5️ When recipient joins the room, server marks the latest message as delivered
     6️ Server sends message_delivered to sender
     7️ Recipient marks room read
@@ -26,30 +28,29 @@ info:
     DELIVERY STRATEGY (Optimized)
     ---------------------------------
 
-    - Delivery is NOT triggered per message manually.
-    - Delivery is triggered automatically when recipient joins the room.
+    - Delivery is NOT triggered per message.
+    - Delivery happens automatically when recipient joins room.
     - Only the latest pending message is marked as delivered.
-    - Frontend marks earlier messages as delivered automatically.
-    - This prevents event flooding and reduces socket traffic.
+    - Frontend auto-marks previous messages as delivered.
+    - Prevents socket flooding.
 
     ---------------------------------
     REAL-TIME SIDEBAR STRATEGY
     ---------------------------------
 
-    - Whenever a new message is sent, server emits "room_updated".
+    - On every new message, server emits "room_updated".
     - Frontend must:
-        1. Update last_message preview
-        2. Update last_message_at timestamp
-        3. Move the room to the top of the list
-    - No API refresh is required.
-    - Sidebar must always rely on WebSocket events.
+        1. Update last message preview
+        2. Update last message timestamp
+        3. Move room to top of list
+    - No REST refresh required.
 
 servers:
   - url: ws://127.0.0.1:8000
     description: Local Development
 
   - url: wss://trilex-1.onrender.com
-    description: Production (Render)
+    description: Production
 
 paths:
   /ws/socket/:
@@ -59,7 +60,7 @@ paths:
         Establish authenticated WebSocket connection.
 
         ----------------------------------------
-         Connection URLs
+        Connection URLs
         ----------------------------------------
 
         Local:
@@ -69,7 +70,7 @@ paths:
         wss://trilex-1.onrender.com/ws/socket/?token=<ACCESS_TOKEN>
 
         ----------------------------------------
-         Frontend Example (Enterprise Flow)
+        Frontend Example
         ----------------------------------------
 
         ```javascript
@@ -95,7 +96,7 @@ paths:
               break;
 
             case "message_sent":
-              // Replace temp message with real DB ID
+              // Replace temp message with real ID
               break;
 
             case "chat_message":
@@ -104,16 +105,16 @@ paths:
 
             case "room_updated":
               // Update sidebar:
-              // - update last message preview
+              // - update last_message
               // - move room to top
               break;
 
             case "message_delivered":
-              // Show double tick ✔✔
+              // Show ✔✔
               break;
 
             case "message_read":
-              // Show blue tick 
+              // Show blue tick
               break;
           }
         };
@@ -147,29 +148,28 @@ paths:
 
       responses:
         "101":
-          description: Switching Protocols (WebSocket Connected)
+          description: WebSocket Connected
 
 components:
   schemas:
 
+    # =============================
+    # REQUEST SCHEMAS
+    # =============================
+
     JoinRoomRequest:
       type: object
-      required:
-        - action
-        - room_id
+      required: [action, room_id]
       properties:
         action:
           type: string
           example: join_room
         room_id:
           type: string
-          example: 8ba73eaa-414e-45f2-b3a6-b1e5cb77927c
 
     LeaveRoomRequest:
       type: object
-      required:
-        - action
-        - room_id
+      required: [action, room_id]
       properties:
         action:
           type: string
@@ -179,11 +179,7 @@ components:
 
     SendMessageRequest:
       type: object
-      required:
-        - action
-        - room_id
-        - message
-        - client_temp_id
+      required: [action, room_id, message, client_temp_id]
       properties:
         action:
           type: string
@@ -197,15 +193,17 @@ components:
 
     MarkReadRequest:
       type: object
-      required:
-        - action
-        - room_id
+      required: [action, room_id]
       properties:
         action:
           type: string
           example: mark_read
         room_id:
           type: string
+
+    # =============================
+    # RESPONSE SCHEMAS
+    # =============================
 
     RoomJoinedResponse:
       type: object
@@ -245,24 +243,30 @@ components:
         type:
           type: string
           example: chat_message
+        id:
+          type: string
+          description: Message ID
         room_id:
           type: string
         message:
           type: string
-        sender_id:
-          type: string
-        sender_name:
-          type: string
-          description: |
-            Human-readable display name of sender.
-            - Client → full_name from ID verification
-            - Lawyer → full_name from bar verification
-            - Firm → firm_name from firm verification
-        message_id:
-          type: string
         created_at:
           type: string
           format: date-time
+        sender:
+          type: object
+          properties:
+            id:
+              type: string
+            name:
+              type: string
+              description: |
+                Human-readable display name.
+                - Client → IDVerification.full_name
+                - Lawyer → BarVerification.full_name
+                - Firm → FirmVerification.firm_name
+            email:
+              type: string
 
     RoomUpdatedResponse:
       type: object
@@ -277,10 +281,89 @@ components:
         last_message_at:
           type: string
           format: date-time
-        sender_id:
+        sender:
+          type: object
+          properties:
+            id:
+              type: string
+            name:
+              type: string
+            email:
+              type: string
+
+    MessageDeliveredResponse:
+      type: object
+      properties:
+        type:
           type: string
-        sender_name:
+          example: message_delivered
+        room_id:
           type: string
-          description: |
-            Display name of the user who sent the latest message.
-            Used for real-time sidebar preview.
+        message_id:
+          type: string
+        delivered_to:
+          type: string
+
+    MessageReadResponse:
+      type: object
+      properties:
+        type:
+          type: string
+          example: message_read
+        room_id:
+          type: string
+        reader_id:
+          type: string
+
+# =============================
+# WEBSOCKET ACTIONS
+# =============================
+
+x-websocket-actions:
+
+  join_room:
+    description: |
+      Join a chat room.
+      Automatically triggers delivery for latest pending message.
+    request:
+      $ref: '#/components/schemas/JoinRoomRequest'
+    response:
+      $ref: '#/components/schemas/RoomJoinedResponse'
+
+  leave_room:
+    description: Leave a chat room.
+    request:
+      $ref: '#/components/schemas/LeaveRoomRequest'
+    response:
+      $ref: '#/components/schemas/RoomLeftResponse'
+
+  send_message:
+    description: |
+      Send a message to a room.
+
+      Flow:
+      1️ message_sent (ACK)
+      2️ chat_message (room broadcast)
+      3️ room_updated (sidebar update)
+      4️ message_delivered (when recipient joins)
+    request:
+      $ref: '#/components/schemas/SendMessageRequest'
+    responses:
+      message_sent:
+        $ref: '#/components/schemas/MessageSentResponse'
+      chat_broadcast:
+        $ref: '#/components/schemas/ChatMessageResponse'
+      sidebar_update:
+        $ref: '#/components/schemas/RoomUpdatedResponse'
+      delivered:
+        $ref: '#/components/schemas/MessageDeliveredResponse'
+
+  mark_read:
+    description: |
+      Mark all messages in a room as read.
+      Triggers message_read event to other participants.
+    request:
+      $ref: '#/components/schemas/MarkReadRequest'
+    responses:
+      read_event:
+        $ref: '#/components/schemas/MessageReadResponse'
