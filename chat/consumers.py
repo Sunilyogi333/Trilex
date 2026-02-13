@@ -5,6 +5,10 @@ from chat.models import ChatParticipant, ChatMessage
 from chat.services.message_service import MessageService
 
 
+# Track online users (simple in-memory presence)
+ONLINE_USERS = set()
+
+
 class SocketConsumer(AsyncWebsocketConsumer):
 
     # =========================
@@ -19,6 +23,9 @@ class SocketConsumer(AsyncWebsocketConsumer):
 
         self.user_group = f"user_{self.user.id}"
 
+        # Mark user online
+        ONLINE_USERS.add(str(self.user.id))
+
         await self.channel_layer.group_add(
             self.user_group,
             self.channel_name
@@ -30,6 +37,9 @@ class SocketConsumer(AsyncWebsocketConsumer):
     # DISCONNECT
     # =========================
     async def disconnect(self, close_code):
+        # Remove user from online set
+        ONLINE_USERS.discard(str(self.user.id))
+
         await self.channel_layer.group_discard(
             self.user_group,
             self.channel_name
@@ -126,26 +136,26 @@ class SocketConsumer(AsyncWebsocketConsumer):
         room_id = data.get("room_id")
         message_text = data.get("message")
         client_temp_id = data.get("client_temp_id")
-
+    
         if not room_id or not message_text:
             return
-
+    
         has_access = await self.validate_participant(room_id)
         if not has_access:
             await self.send(json.dumps({"error": "Access denied"}))
             return
-
+    
         message = await self.save_message(room_id, message_text)
-
-        # message_sent ACK (only to sender)
+    
+        # ACK to sender
         await self.send(json.dumps({
             "type": "message_sent",
             "client_temp_id": client_temp_id,
             "message_id": message["id"],
             "created_at": message["created_at"],
         }))
-
-        # Broadcast chat_message to room
+    
+        # Broadcast message to room
         await self.channel_layer.group_send(
             f"chat_{room_id}",
             {
@@ -153,19 +163,37 @@ class SocketConsumer(AsyncWebsocketConsumer):
                 **message
             }
         )
-
-        # Sidebar update — NOW MATCHES API STRUCTURE
+    
+        # Sidebar update
         participants = await self.get_room_participants(room_id)
-
+    
         for user_id in participants:
             await self.channel_layer.group_send(
                 f"user_{user_id}",
                 {
                     "type": "room_updated",
                     "room_id": room_id,
-                    "last_message": message,  # full unified message object
+                    "last_message": message,
                 }
             )
+    
+        # =========================
+        # DELIVERY LOGIC (FIXED)
+        # =========================
+        for user_id in participants:
+            user_id_str = str(user_id)
+
+            # ✅ Only trigger delivered if recipient is online
+            if user_id_str != str(self.user.id) and user_id_str in ONLINE_USERS:
+                await self.channel_layer.group_send(
+                    f"user_{self.user.id}",  # notify sender
+                    {
+                        "type": "message_delivered",
+                        "room_id": room_id,
+                        "message_id": message["id"],
+                        "delivered_to": user_id_str,
+                    }
+                )
 
     # =========================
     # MARK READ
