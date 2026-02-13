@@ -1,42 +1,31 @@
-# media/services/cloudinary_service.py
-
+import os
 import cloudinary.uploader
-import cloudinary.api
 
 
 class CloudinaryService:
-    """
-    Handles Cloudinary uploads & deletions.
-    """
 
     @staticmethod
-    def upload_image(file, folder: str = "trilex"):
+    def upload_file(file, folder: str = "trilex"):
         """
-        Uploads file to Cloudinary.
+        Dynamically detect resource type based on file extension.
+        """
 
-        Returns:
-            {
-                "url": secure_url,
-                "public_id": public_id
-            }
-        """
+        extension = os.path.splitext(file.name)[1].lower()
+
+        if extension in [".jpg", ".jpeg", ".png", ".gif", ".webp"]:
+            resource_type = "image"
+        elif extension in [".mp4", ".mov", ".avi"]:
+            resource_type = "video"
+        else:
+            resource_type = "raw"
+
         result = cloudinary.uploader.upload(
             file,
             folder=folder,
-            resource_type="image"
+            resource_type=resource_type
         )
 
         return {
             "url": result["secure_url"],
             "public_id": result["public_id"],
         }
-
-    @staticmethod
-    def delete_image(public_id: str):
-        """
-        Deletes image from Cloudinary.
-        """
-        cloudinary.uploader.destroy(
-            public_id,
-            resource_type="image"
-        )

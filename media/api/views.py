@@ -36,7 +36,7 @@ class ImageUploadView(APIView):
         if not file:
             return Response({"error": "file is required"}, status=400)
 
-        upload_result = CloudinaryService.upload_image(
+        upload_result = CloudinaryService.upload_file(
             file,
             folder="trilex/uploads"
         )

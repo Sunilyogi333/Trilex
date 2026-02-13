@@ -5,7 +5,7 @@ from media.models import Image
 
 
 class ImageUploadSerializer(serializers.Serializer):
-    file = serializers.ImageField()
+    file = serializers.FileField()
 
 class ImageSerializer(serializers.ModelSerializer):
     class Meta:
