@@ -182,12 +182,19 @@ class LawyerListView(APIView):
                 location=OpenApiParameter.QUERY,
                 description="District ID",
             ),
+            OpenApiParameter(
+                name="has_firm",
+                type=bool,
+                location=OpenApiParameter.QUERY,
+                description="Filter lawyers by firm association",
+            ),
         ],
         responses={200: LawyerPublicSerializer(many=True)},
         tags=["lawyers"],
     )
     def get(self, request):
         admin = is_admin_user(request.user)
+        has_firm = request.query_params.get("has_firm")
 
         search = request.query_params.get("search")
         services = request.query_params.get("services")
@@ -219,6 +226,15 @@ class LawyerListView(APIView):
         if services:
             qs = qs.filter(services__id__in=services.split(","))
 
+        if has_firm is not None:
+            value = has_firm.lower()
+        
+            if value in ["true", "1", "yes"]:
+                qs = qs.filter(firm_membership__isnull=False)
+            elif value in ["false", "0", "no"]:
+                qs = qs.filter(firm_membership__isnull=True)
+        
+        
         # 📍 Filter by province
         if province:
             qs = qs.filter(address__province_id=province)
